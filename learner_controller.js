@@ -1,4 +1,36 @@
 class LearnerController {
+    // CHÈN THÊM HÀM NÀY VÀO TRÊN CÙNG CỦA CLASS LEARNERCONTROLLER
+    renderAuthZone() {
+        let authContainer = document.getElementById('auth-zone');
+        // Nếu trong file HTML chưa có thẻ div id="auth-zone", hệ thống sẽ tự tạo một cái ở đầu trang
+        if (!authContainer) {
+            authContainer = document.createElement('div');
+            authContainer.id = 'auth-zone';
+            authContainer.className = 'max-w-6xl mx-auto px-4 pt-4 flex justify-end';
+            document.body.insertBefore(authContainer, document.body.firstChild);
+        }
+
+        const user = window.db.currentUser;
+        if (user) {
+            authContainer.innerHTML = `
+                <div class="flex items-center space-x-3 text-sm">
+                    <span class="text-slate-600 font-medium">Tài khoản: <strong>${user.username}</strong></span>
+                    <button onclick="window.learnerCtrl.logoutSubmit()" class="text-rose-600 hover:text-rose-700 font-semibold bg-rose-50 px-3 py-1.5 rounded-xl transition">Đăng Xuất 🚪</button>
+                </div>
+            `;
+        } else {
+            authContainer.innerHTML = `
+                <button onclick="window.learnerCtrl.triggerLogin()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition shadow-sm">Đăng Nhập Hệ Thống</button>
+            `;
+        }
+    }
+
+    // Tiện tay thêm luôn hàm logoutSubmit() hỗ trợ cho nút Đăng Xuất ở trên
+    logoutSubmit() {
+        window.db.logout();
+        this.renderDashboard();
+        showToast("🔒 Đã đăng xuất an toàn.");
+    }
     renderDashboard() {
         this.renderAuthZone();
         const container = document.getElementById('app-container');
