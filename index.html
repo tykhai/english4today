@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Smart English - Gây Nghiện Bằng Sơ Đồ Tư Duy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <style>
+        .font-reading { font-family: 'Lora', Georgia, serif; }
+        .font-sans-custom { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="font-sans-custom h-full flex flex-col text-slate-800">
+
+    <nav class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">⚡</span>
+            <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">AntEnglish</h1>
+        </div>
+        <div id="nav-auth-zone" class="flex items-center space-x-4">
+            </div>
+    </nav>
+
+    <main id="app-container" class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 overflow-y-auto">
+        <div id="view-loading" class="text-center py-20 text-slate-400">Đang khởi tạo hệ thống học tập...</div>
+    </main>
+
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none z-50"></div>
+
+    <script src="db_manager.js"></script>
+    <script src="admin_controller.js"></script>
+    <script src="learner_controller.js"></script>
+    <script>
+        // Hàm khởi tạo và điều hướng chính của toàn bộ hệ thống
+        document.addEventListener("DOMContentLoaded", async () => {
+            window.db = new DatabaseManager();
+            window.adminCtrl = new AdminController();
+            window.learnerCtrl = new LearnerController();
+
+            // Giả lập check Session đăng nhập ban đầu
+            await window.db.init();
+            window.learnerCtrl.renderDashboard(); 
+        });
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg; t.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 2500);
+        }
+    </script>
+</body>
+</html>
