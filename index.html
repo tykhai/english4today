@@ -40,8 +40,7 @@
             window.learnerCtrl = new LearnerController();
 
             // Giả lập check Session đăng nhập ban đầu
-            await window.db.init();
-            window.learnerCtrl.renderDashboard(); 
+           window.learnerCtrl.renderDashboard();
         });
 
         function showToast(msg) {
