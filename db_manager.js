@@ -29,7 +29,6 @@ class DatabaseManager {
 
 async login(username, password) {
     try {
-        // Gọi trực tiếp fetch tới Supabase để kiểm soát 100% dữ liệu trả về
         const response = await fetch(`${this.supabaseUrl}/rest/v1/users?username=eq.${username}&password_hash=eq.${password}`, {
             method: 'GET',
             headers: {
@@ -39,31 +38,26 @@ async login(username, password) {
             }
         });
 
-        if (!response.ok) {
-            console.error("🚨 Supabase trả về lỗi HTTP:", response.status);
-            return null;
-        }
+        // 1. Đọc dữ liệu trả về dưới dạng văn bản thô (Raw Text)
+        const rawText = await response.text();
+        
+        // 2. Bật thông báo hiển thị nguyên văn chuỗi nhận được từ DB lên màn hình
+        alert(`[DỮ LIỆU THÔ TỪ SUPABASE]:\n${rawText}`);
 
-        // Bóc tách mảng dữ liệu JSON thật
-        const users = await response.json();
-        console.log("🔍 Dữ liệu mảng nhận được sau khi ép kiểu JSON:", users);
+        // 3. Tiến hành ép kiểu sang JSON để xử lý logic tiếp theo
+        const users = JSON.parse(rawText);
 
-        // Kiểm tra xem mảng có phần tử nào trùng khớp không
         if (users && users.length > 0) {
             const userAccount = users[0];
-            
-            // Lưu thông tin User đăng nhập thành công vào hệ thống
             this.currentUser = userAccount;
             localStorage.setItem('user_session', JSON.stringify(this.currentUser));
-            
             return this.currentUser; 
         }
         
-        // Nếu mảng rỗng []
-        console.log("⚠️ Mảng trả về rỗng. Tài khoản hoặc mật khẩu không khớp trong DB.");
         return null; 
     } catch (err) {
-        console.error("Lỗi nghiêm trọng tại hàm login():", err);
+        alert(`🚨 Lỗi thực thi hàm login: ${err.message}`);
+        console.error(err);
         return null;
     }
 }
