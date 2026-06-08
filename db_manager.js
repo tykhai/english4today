@@ -29,26 +29,41 @@ class DatabaseManager {
 
 async login(username, password) {
     try {
-        // Gửi truy vấn đến Supabase
-        const users = await this.request(`users?username=eq.${username}&password_hash=eq.${password}`);
-        
-        if (!users || users.length === 0) {
-            console.log("❌ Không tìm thấy tài khoản trùng khớp.");
+        // Gọi trực tiếp fetch tới Supabase để kiểm soát 100% dữ liệu trả về
+        const response = await fetch(`${this.supabaseUrl}/rest/v1/users?username=eq.${username}&password_hash=eq.${password}`, {
+            method: 'GET',
+            headers: {
+                'apikey': this.supabaseKey,
+                'Authorization': `Bearer ${this.supabaseKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            console.error("🚨 Supabase trả về lỗi HTTP:", response.status);
             return null;
         }
 
-        // Đã tìm thấy cơ sở dữ liệu trùng khớp (Mã 200 OK của bạn)
-        const userAccount = users[0];
+        // Bóc tách mảng dữ liệu JSON thật
+        const users = await response.json();
+        console.log("🔍 Dữ liệu mảng nhận được sau khi ép kiểu JSON:", users);
+
+        // Kiểm tra xem mảng có phần tử nào trùng khớp không
+        if (users && users.length > 0) {
+            const userAccount = users[0];
+            
+            // Lưu thông tin User đăng nhập thành công vào hệ thống
+            this.currentUser = userAccount;
+            localStorage.setItem('user_session', JSON.stringify(this.currentUser));
+            
+            return this.currentUser; 
+        }
         
-        // BỎ QUA kiểm tra is_banned nếu bảng chưa có cột này để tránh lỗi treo ứng dụng
-        this.currentUser = userAccount;
-        
-        // Lưu Session vào trình duyệt để giữ trạng thái đăng nhập
-        localStorage.setItem('user_session', JSON.stringify(this.currentUser));
-        
-        return this.currentUser; 
+        // Nếu mảng rỗng []
+        console.log("⚠️ Mảng trả về rỗng. Tài khoản hoặc mật khẩu không khớp trong DB.");
+        return null; 
     } catch (err) {
-        console.error("Lỗi thực thi tại hàm login():", err);
+        console.error("Lỗi nghiêm trọng tại hàm login():", err);
         return null;
     }
 }
