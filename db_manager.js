@@ -1,26 +1,59 @@
 class DatabaseManager {
     constructor() {
-        // Cấu hình kết nối Supabase Cloud (Bạn thay URL và Key của bạn vào đây)
+        // ĐIỀN THÔNG TIN SUPABASE CỦA BẠN VÀO ĐÂY ĐỂ KẾT NỐI THẬT
         this.supabaseUrl = "https://xgixilajyehjdcauoleh.supabase.co";
         this.supabaseKey = "sb_publishable_uyxVz0n48exFMwzRKeqOiQ_le0a8LUq";
         this.currentUser = JSON.parse(localStorage.getItem('user_session')) || null;
     }
 
     async init() {
-        console.log("Database Cloud đã sẵn sàng kết nối.");
-        // Code thực tế sẽ gọi fetch kiểm tra trạng thái network hoặc DB ở đây
+        console.log("⚡ Hệ thống Database Cloud Supabase đã kích hoạt.");
     }
 
-    // Logic Đăng nhập (Auth) trực tiếp vào DB
-    async login(username, password) {
-        // Mô phỏng API Auth từ Database Cloud bảo mật
-        if(username === "admin" && password === "admin123") {
-            this.currentUser = { user_id: "u1", username: "admin", role: "admin" };
-        } else {
-            this.currentUser = { user_id: "u2", username: "Khải Lê", role: "learner" };
+    // Hàm gọi API dùng chung để tương tác với Supabase không cần cài thư viện cồng kềnh
+    async request(path, method = 'GET', body = null) {
+        const url = `${this.supabaseUrl}/rest/v1/${path}`;
+        const headers = {
+            "apikey": this.supabaseKey,
+            "Authorization": `Bearer ${this.supabaseKey}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        };
+        const config = { method, headers };
+        if (body) config.body = JSON.stringify(body);
+
+        try {
+            const response = await fetch(url, config);
+            if (!response.ok) throw new Error(await response.text());
+            return await response.json();
+        } catch (error) {
+            console.error("Database Error:", error);
+            showToast("❌ Lỗi kết nối Cơ sở dữ liệu Cloud!");
+            return null;
         }
-        localStorage.setItem('user_session', JSON.stringify(this.currentUser));
-        return this.currentUser;
+    }
+
+    // ĐĂNG KÝ USER MỚI
+    async register(username, password) {
+        const existing = await this.request(`users?username=eq.${username}`);
+        if (existing && existing.length > 0) {
+            alert("❌ Tên tài khoản này đã tồn tại!");
+            return false;
+        }
+        const newUser = { username, password_hash: password, role: 'learner', allow_reading_part: true, allow_vocab_part: true };
+        const result = await this.request('users', 'POST', newUser);
+        return result ? true : false;
+    }
+
+    // ĐĂNG NHẬP THẬT TỪ DATABASE
+    async login(username, password) {
+        const users = await this.request(`users?username=eq.${username}&password_hash=eq.${password}`);
+        if (users && users.length > 0) {
+            this.currentUser = users[0];
+            localStorage.setItem('user_session', JSON.stringify(this.currentUser));
+            return this.currentUser;
+        }
+        return null;
     }
 
     logout() {
@@ -28,44 +61,32 @@ class DatabaseManager {
         localStorage.removeItem('user_session');
     }
 
-    // Lấy bài đọc từ Database dựa trên Cấp độ
-    async getReadingLessons(level) {
-        // Gọi API Cloud lấy bài đọc theo điều kiện `level = level`
-        return [
-            {
-                lesson_id: "l1", level: "B", title: "Ứng dụng AI trong Chăn nuôi Thủy sản 2026",
-                content: "Artificial intelligence is expanding rapidly in aquaculture. Farmers are using smart sensors to monitor water minerals like Kaolin and Zeolite to maximize shrimp health.",
-                grammar_points: [
-                    { structures: "Present Continuous (S + is/are + V-ing)", explanation: "Diễn tả hành động đang tiến triển nhanh chóng (is expanding).", examples: ["The technology is developing day by day."] }
-                ]
-            }
-        ];
+    // LẤY DANH SÁCH TẤT CẢ USER (Dành cho Admin quản lý)
+    async getAllUsers() {
+        return await this.request('users?order=created_at.desc');
     }
 
-    // Lưu dữ liệu bài học do Admin nhập vào Cloud DB
+    // CẬP NHẬT QUYỀN HẠN USER
+    async updateUserPermissions(userId, updates) {
+        return await this.request(`users?user_id=eq.${userId}`, 'PATCH', updates);
+    }
+
+    // XÓA USER
+    async deleteUser(userId) {
+        return await this.request(`users?user_id=eq.${userId}`, 'DELETE');
+    }
+
+    // LẤY BÀI ĐỌC THỰC TẾ
+    async getReadingLessons(level) {
+        const data = await this.request(`reading_lessons?level=eq.${level}&limit=1`);
+        return data || [];
+    }
+
     async saveLesson(lessonData) {
-        showToast("💾 Đang lưu bài đọc mới lên Cloud Database...");
-        console.log("POST to /reading_lessons", lessonData);
-        return true;
+        return await this.request('reading_lessons', 'POST', lessonData);
     }
 
     async saveVocabulary(vocabData) {
-        showToast("💾 Đang nạp bộ từ vựng mới vào Database...");
-        console.log("POST to /vocabularies", vocabData);
-        return true;
-    }
-
-    // THUẬT TOÁN SRS (Spaced Repetition System) - Xử lý khi user bấm nút "Thuộc" hoặc "Chưa thuộc"
-    async updateProgress(vocabId, rating) {
-        // rating: 'hard' (chưa thuộc), 'good' (mơ hồ), 'easy' (đã thuộc)
-        let daysToAdd = 1;
-        if (rating === 'good') daysToAdd = 3;
-        if (rating === 'easy') daysToAdd = 7;
-
-        let nextReview = new Date();
-        nextReview.setDate(nextReview.getDate() + daysToAdd);
-
-        showToast(`🔄 Đã cập nhật lịch ôn tập: Quay lại sau ${daysToAdd} ngày!`);
-        // Đồng bộ lên bảng `learning_progress` trên Cloud
+        return await this.request('vocabularies', 'POST', vocabData);
     }
 }
