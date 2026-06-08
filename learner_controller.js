@@ -284,13 +284,31 @@ class LearnerController {
 
     async triggerLogin() {
         const user = prompt("Nhập tài khoản:");
+        if (!user) return;
         const pass = prompt("Nhập mật khẩu:");
-        if(!user || !pass) return;
+        if (!pass) return;
+    
+        // Hiển thị thông báo trạng thái để người dùng biết hệ thống đang xử lý
+        console.log("🔄 Đang gửi yêu cầu xác thực lên Cloud Supabase...");
+    
+        try {
+            const u = await window.db.login(user.trim(), pass.trim());
         
-        const u = await window.db.login(user, pass);
-        if (u) {
-            this.renderDashboard();
-            showToast("👋 Đăng nhập thành công!");
+            if (u) {
+                console.log("✅ Đăng nhập thành công, dữ liệu User:", u);
+                this.renderDashboard();
+                if (typeof showToast === "function") {
+                    showToast("👋 Đăng nhập thành công!");
+                } else {
+                    alert(`👋 Chào mừng trở lại, ${u.username}!`);
+                }
+            } else {
+                // Trường hợp tài khoản/mật khẩu sai hoặc tài khoản bị khóa
+                alert("❌ Tài khoản hoặc mật khẩu không chính xác, hoặc tài khoản đã bị khóa tạm thời!");
+            }
+        } catch (error) {
+            console.error("Lỗi nghiêm trọng trong quá trình đăng nhập:", error);
+            alert("🚨 Không thể kết nối tới Cloud Database. Vui lòng kiểm tra lại mạng hoặc cấu hình mã nguồn!");
         }
     }
 

@@ -28,18 +28,35 @@ class DatabaseManager {
     }
 
     async login(username, password) {
-        // Kiểm tra tài khoản và mật khẩu, đồng thời kiểm tra xem user có bị khóa (is_banned) không
-        const users = await this.request(`users?username=eq.${username}&password_hash=eq.${password}`);
-        if (users && users.length > 0) {
-            if (users[0].is_banned) {
-                alert("❌ Tài khoản của bạn hiện đang bị khóa tạm thời do vi phạm điều khoản!");
+        try {
+            // Truy vấn thẳng tới bảng users trên Supabase
+            const users = await this.request(`users?username=eq.${username}&password_hash=eq.${password}`);
+        
+            // Nếu kết nối thất bại hoặc không trả về mảng
+            if (!users) {
+                console.error("🚨 Supabase không phản hồi dữ liệu (Có thể sai URL hoặc API Key).");
                 return null;
             }
-            this.currentUser = users[0];
-            localStorage.setItem('user_session', JSON.stringify(this.currentUser));
-            return this.currentUser;
-        }
+
+            if (users.length > 0) {
+                const userAccount = users[0];
+            
+                // Kiểm tra trạng thái khóa tài khoản (Yêu cầu 1)
+                if (userAccount.is_banned === true || userAccount.is_banned === "true") {
+                    alert("❌ Tài khoản này đã bị khóa tạm thời do vi phạm quy định!");
+                    return null;
+                }
+            
+                this.currentUser = userAccount;
+                localStorage.setItem('user_session', JSON.stringify(this.currentUser));
+                return this.currentUser;
+            }
+        
+            return null; // Không tìm thấy user trùng khớp
+        } catch (err) {
+        console.error("Lỗi thực thi hàm login():", err);
         return null;
+        }
     }
 
     logout() {
