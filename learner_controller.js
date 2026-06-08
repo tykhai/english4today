@@ -2,31 +2,34 @@ class LearnerController {
     renderDashboard() {
         this.renderAuthZone();
         const container = document.getElementById('app-container');
+        const user = window.db.currentUser;
         container.innerHTML = `
             <div class="space-y-8">
-                <div class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
-                    <div class="relative z-10">
-                        <h2 class="text-2xl font-bold">Chào mừng bạn trở lại học tập! 🔥</h2>
-                        <p class="text-white/80 text-sm mt-1">Đừng để "Đường cong quên lãng" xóa mất từ vựng của bạn. Hãy dứt điểm mục tiêu hôm nay nào!</p>
-                        <div class="mt-4 max-w-xs bg-white/20 h-2 w-full rounded-full overflow-hidden">
-                            <div class="bg-white h-full w-[65%] transition-all duration-500"></div>
-                        </div>
-                        <span class="text-xs text-white/90 mt-1 block">Hôm nay bạn đã hoàn thành 65% mục tiêu ôn tập</span>
-                    </div>
+                <div class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl p-6 text-white shadow-lg">
+                    <h2 class="text-2xl font-bold">Chào mừng bạn trở lại học tập! 🔥</h2>
+                    <p class="text-white/80 text-sm mt-1">Hôm nay bạn đang đăng nhập với tư cách: <b class="text-amber-300">${user ? user.username : 'Khách'}</b></p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition cursor-pointer" onclick="window.learnerCtrl.startReadingView('B')">
                         <div class="text-3xl mb-2">📚</div>
                         <h3 class="font-bold text-lg text-slate-900">Luyện Bài Đọc Theo Cấp Độ</h3>
-                        <p class="text-slate-500 text-sm mt-1">Học ngữ pháp, tra cứu trực tiếp từ vựng ngay trong ngữ cảnh bài đọc thực tế.</p>
+                        <p class="text-slate-500 text-sm mt-1">Học ngữ pháp, tra cứu trực tiếp từ vựng ngay trong ngữ cảnh.</p>
                     </div>
 
                     <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition cursor-pointer" onclick="window.learnerCtrl.startVocabView()">
                         <div class="text-3xl mb-2">🧠</div>
-                        <h3 class="font-bold text-lg text-slate-900">Từ Vựng Theo Ngày & Sơ Đồ Tư Duy</h3>
-                        <p class="text-slate-500 text-sm mt-1">Mẹo học hài hước thông qua cốt truyện, mở rộng tiền tố, hậu tố cực nhanh.</p>
+                        <h3 class="font-bold text-lg text-slate-900">Từ Vựng & Sơ Đồ Tư Duy</h3>
+                        <p class="text-slate-500 text-sm mt-1">Mẹo học hài hước thông qua cốt truyện, sơ đồ tư duy rực rỡ.</p>
                     </div>
+
+                    ${user && user.role === 'admin' ? `
+                    <div class="bg-amber-50 p-6 rounded-2xl border-2 border-dashed border-amber-300 shadow-sm hover:shadow-md transition cursor-pointer" onclick="window.adminCtrl.renderAdminPanel()">
+                        <div class="text-3xl mb-2">⚙️</div>
+                        <h3 class="font-bold text-lg text-amber-800">Bảng Quản Trị (Admin)</h3>
+                        <p class="text-amber-600 text-sm mt-1">Khu vực dành riêng cho bạn để nạp thêm bài đọc, sửa danh sách từ vựng.</p>
+                    </div>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -65,8 +68,50 @@ class LearnerController {
     }
 
     highlightContent(content) {
-        // Tự động tìm và bôi đậm từ vựng khóa để tương tác nhanh khi click học viên
-        return content.replace(/(Kaolin|Zeolite|expanding)/g, `<span class="bg-amber-100 text-amber-900 font-bold px-1 rounded cursor-pointer border-b-2 border-amber-400 hover:bg-amber-200" onclick="alert('💡 Từ vựng hệ thống: Tra cứu sơ đồ tư duy từ này ở phần Học từ vựng!')">$1</span>`);
+        // Tự động bọc các từ khóa bằng thẻ span có chứa class tương tác và thuộc tính dữ liệu
+        return content.replace(/(Kaolin|Zeolite|expanding)/g, 
+            `<span class="bg-amber-100 text-amber-900 font-bold px-1 rounded cursor-pointer border-b-2 border-amber-400 hover:bg-amber-200 transition" 
+                   onclick="window.learnerCtrl.showWordPopup(event, '$1')">$1</span>`);
+    }
+
+    // Hàm hiển thị Popup giải nghĩa ngay tại vị trí Click
+    showWordPopup(event, word) {
+        // Xóa popup cũ nếu có
+        const oldPopup = document.getElementById('word-reader-popup');
+        if (oldPopup) oldPopup.remove();
+
+        // Dữ liệu mẫu (Khi chạy thật sẽ fetch từ bảng vocabularies của database dựa vào 'word')
+        const dictionary = {
+            "expanding": { phonetic: "/ɪkˈspændɪŋ/", meaning: "Mở rộng, phát triển nhanh chóng" },
+            "Kaolin": { phonetic: "/ˈkeɪəlɪn/", meaning: "Cao lanh (Khoáng chất đất sét trong thủy sản)" },
+            "Zeolite": { phonetic: "/ˈziːəlaɪt/", meaning: "Khoáng chất Zeolite (Hấp thụ độc tố, làm sạch nước)" }
+        };
+
+        const data = dictionary[word] || { phonetic: "/.../", meaning: "Từ vựng hệ thống" };
+
+        // Tạo thành phần UI Popup
+        const popup = document.createElement('div');
+        popup.id = 'word-reader-popup';
+        popup.className = 'absolute bg-slate-900 text-white p-4 rounded-xl shadow-2xl z-50 text-sm max-w-xs space-y-2 border border-slate-700 animate-fade-in';
+        popup.innerHTML = `
+            <div class="flex justify-between items-center space-x-4">
+                <span class="font-bold text-amber-400 text-base">${word}</span>
+                <button onclick="window.learnerCtrl.speak('${word}')" class="bg-indigo-600 hover:bg-indigo-700 p-1 rounded-full text-xs">🔊 Nghe</button>
+            </div>
+            <div class="text-xs text-slate-400 font-mono">${data.phonetic}</div>
+            <div class="text-slate-200 border-t border-slate-700 pt-1.5">${data.meaning}</div>
+        `;
+
+        // Định vị vị trí popup ngay trên từ vừa click
+        document.body.appendChild(popup);
+        popup.style.left = `${event.pageX - (popup.offsetWidth / 2)}px`;
+        popup.style.top = `${event.pageY - popup.offsetHeight - 12}px`;
+
+        // Click ra ngoài để tắt popup
+        setTimeout(() => {
+            const closePopup = () => { popup.remove(); document.removeEventListener('click', closePopup); };
+            document.addEventListener('click', closePopup);
+        }, 100);
     }
 
     // MÀN HÌNH TỪ VỰNG - SƠ ĐỒ TƯ DUY (MINDMAP)
@@ -84,7 +129,12 @@ class LearnerController {
                     <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                         <div>
                             <div class="flex items-baseline space-x-2">
+                                <div class="flex items-center space-x-3">
                                 <h3 id="side-word" class="text-3xl font-bold text-indigo-600">Success</h3>
+                                <button onclick="window.learnerCtrl.speak(document.getElementById('side-word').innerText)" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 p-2 rounded-xl transition text-sm">
+                                    🔊 Phát âm
+                                </button>
+                            </div>
                                 <span id="side-phonetic" class="text-slate-400 text-sm font-mono">/səkˈses/</span>
                             </div>
                             <p id="side-meaning" class="text-lg font-medium text-slate-800 mt-1">Sự thành công</p>
@@ -145,9 +195,36 @@ class LearnerController {
     }
 
     triggerLogin() {
-        // Hàm kích hoạt nhanh đăng nhập để phân quyền quản trị
-        const user = prompt("Nhập username (Nhập 'admin' để test quyền admin):");
+        const user = prompt("Nhập username (Nhập 'admin' để vào quyền quản trị):");
         const pass = prompt("Nhập password:");
-        window.db.login(user, pass).then(() => this.renderDashboard());
+    
+        window.db.login(user, pass).then((loggedInUser) => {
+            if (loggedInUser) {
+                this.renderDashboard();
+                showToast(`👋 Chào mừng ${loggedInUser.username} đã đăng nhập!`);
+            } else {
+                alert("❌ Sai tài khoản hoặc mật khẩu!");
+            }
+        });
+    }
+    speak(text) {
+        if ('speechSynthesis' in window) {
+            // Hủy các giọng đọc đang bị nghẽn trước đó
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US'; // Đặt ngôn ngữ chuẩn Mỹ (Có thể đổi thành 'en-GB' nếu muốn giọng Anh)
+            utterance.rate = 0.9;     // Tốc độ đọc (0.9 giúp người học nghe rõ từng âm tiết hơn)
+            utterance.pitch = 1.0;    // Cao độ giọng đọc
+
+            // Chọn giọng đọc cao cấp (Premium) nếu trình duyệt có sẵn
+            const voices = window.speechSynthesis.getVoices();
+            const premiumVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha'));
+            if (premiumVoice) utterance.voice = premiumVoice;
+
+            window.speechSynthesis.speak(utterance);
+        } else {
+            alert("❌ Trình duyệt của bạn không hỗ trợ tính năng phát âm tự động.");
+        }
     }
 }
