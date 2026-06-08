@@ -1,16 +1,11 @@
+
 class DatabaseManager {
     constructor() {
-        // ĐIỀN THÔNG TIN SUPABASE CỦA BẠN VÀO ĐÂY ĐỂ KẾT NỐI THẬT
         this.supabaseUrl = "https://xgixilajyehjdcauoleh.supabase.co";
         this.supabaseKey = "sb_publishable_uyxVz0n48exFMwzRKeqOiQ_le0a8LUq";
         this.currentUser = JSON.parse(localStorage.getItem('user_session')) || null;
     }
 
-    async init() {
-        console.log("⚡ Hệ thống Database Cloud Supabase đã kích hoạt.");
-    }
-
-    // Hàm gọi API dùng chung để tương tác với Supabase không cần cài thư viện cồng kềnh
     async request(path, method = 'GET', body = null) {
         const url = `${this.supabaseUrl}/rest/v1/${path}`;
         const headers = {
@@ -28,27 +23,18 @@ class DatabaseManager {
             return await response.json();
         } catch (error) {
             console.error("Database Error:", error);
-            showToast("❌ Lỗi kết nối Cơ sở dữ liệu Cloud!");
             return null;
         }
     }
 
-    // ĐĂNG KÝ USER MỚI
-    async register(username, password) {
-        const existing = await this.request(`users?username=eq.${username}`);
-        if (existing && existing.length > 0) {
-            alert("❌ Tên tài khoản này đã tồn tại!");
-            return false;
-        }
-        const newUser = { username, password_hash: password, role: 'learner', allow_reading_part: true, allow_vocab_part: true };
-        const result = await this.request('users', 'POST', newUser);
-        return result ? true : false;
-    }
-
-    // ĐĂNG NHẬP THẬT TỪ DATABASE
     async login(username, password) {
+        // Kiểm tra tài khoản và mật khẩu, đồng thời kiểm tra xem user có bị khóa (is_banned) không
         const users = await this.request(`users?username=eq.${username}&password_hash=eq.${password}`);
         if (users && users.length > 0) {
+            if (users[0].is_banned) {
+                alert("❌ Tài khoản của bạn hiện đang bị khóa tạm thời do vi phạm điều khoản!");
+                return null;
+            }
             this.currentUser = users[0];
             localStorage.setItem('user_session', JSON.stringify(this.currentUser));
             return this.currentUser;
@@ -61,25 +47,48 @@ class DatabaseManager {
         localStorage.removeItem('user_session');
     }
 
-    // LẤY DANH SÁCH TẤT CẢ USER (Dành cho Admin quản lý)
+    // ADMIN: Tạo trực tiếp User (Học sinh hoặc Quản trị) không cần qua form đăng ký tự do
+    async adminCreateUser(username, password, role) {
+        const existing = await this.request(`users?username=eq.${username}`);
+        if (existing && existing.length > 0) return { success: false, msg: "Tài khoản đã tồn tại!" };
+        
+        const newUser = { 
+            username, 
+            password_hash: password, 
+            role: role, 
+            allow_reading_part: true, 
+            allow_vocab_part: true,
+            is_banned: false 
+        };
+        const res = await this.request('users', 'POST', newUser);
+        return res ? { success: true } : { success: false, msg: "Lỗi hệ thống Cloud!" };
+    }
+
+    // ADMIN & USER: Thay đổi mật khẩu tài khoản
+    async changePassword(userId, newPassword) {
+        return await this.request(`users?user_id=eq.${userId}`, 'PATCH', { password_hash: newPassword });
+    }
+
     async getAllUsers() {
         return await this.request('users?order=created_at.desc');
     }
 
-    // CẬP NHẬT QUYỀN HẠN USER
     async updateUserPermissions(userId, updates) {
         return await this.request(`users?user_id=eq.${userId}`, 'PATCH', updates);
     }
 
-    // XÓA USER
     async deleteUser(userId) {
         return await this.request(`users?user_id=eq.${userId}`, 'DELETE');
     }
 
-    // LẤY BÀI ĐỌC THỰC TẾ
     async getReadingLessons(level) {
-        const data = await this.request(`reading_lessons?level=eq.${level}&limit=1`);
-        return data || [];
+        return await this.request(`reading_lessons?level=eq.${level}&limit=1`) || [];
+    }
+
+    // LẤY THÔNG TIN TỪ VỰNG DỰA VÀO TỪ KHÓA ĐỂ LÀM POPUP HOẶC MINDMAP
+    async getVocabularyWord(word) {
+        const data = await this.request(`vocabularies?word=ilike.${word}`);
+        return data && data.length > 0 ? data[0] : null;
     }
 
     async saveLesson(lessonData) {
