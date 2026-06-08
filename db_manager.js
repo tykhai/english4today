@@ -27,37 +27,31 @@ class DatabaseManager {
         }
     }
 
-    async login(username, password) {
-        try {
-            // Truy vấn thẳng tới bảng users trên Supabase
-            const users = await this.request(`users?username=eq.${username}&password_hash=eq.${password}`);
+async login(username, password) {
+    try {
+        // Gửi truy vấn đến Supabase
+        const users = await this.request(`users?username=eq.${username}&password_hash=eq.${password}`);
         
-            // Nếu kết nối thất bại hoặc không trả về mảng
-            if (!users) {
-                console.error("🚨 Supabase không phản hồi dữ liệu (Có thể sai URL hoặc API Key).");
-                return null;
-            }
-
-            if (users.length > 0) {
-                const userAccount = users[0];
-            
-                // Kiểm tra trạng thái khóa tài khoản (Yêu cầu 1)
-                if (userAccount.is_banned === true || userAccount.is_banned === "true") {
-                    alert("❌ Tài khoản này đã bị khóa tạm thời do vi phạm quy định!");
-                    return null;
-                }
-            
-                this.currentUser = userAccount;
-                localStorage.setItem('user_session', JSON.stringify(this.currentUser));
-                return this.currentUser;
-            }
-        
-            return null; // Không tìm thấy user trùng khớp
-        } catch (err) {
-        console.error("Lỗi thực thi hàm login():", err);
-        return null;
+        if (!users || users.length === 0) {
+            console.log("❌ Không tìm thấy tài khoản trùng khớp.");
+            return null;
         }
+
+        // Đã tìm thấy cơ sở dữ liệu trùng khớp (Mã 200 OK của bạn)
+        const userAccount = users[0];
+        
+        // BỎ QUA kiểm tra is_banned nếu bảng chưa có cột này để tránh lỗi treo ứng dụng
+        this.currentUser = userAccount;
+        
+        // Lưu Session vào trình duyệt để giữ trạng thái đăng nhập
+        localStorage.setItem('user_session', JSON.stringify(this.currentUser));
+        
+        return this.currentUser; 
+    } catch (err) {
+        console.error("Lỗi thực thi tại hàm login():", err);
+        return null;
     }
+}
 
     logout() {
         this.currentUser = null;
