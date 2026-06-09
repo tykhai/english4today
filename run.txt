@@ -1,1 +1,5 @@
+Chạy local:
 streamlit run app.py
+Chạy webserver free:
+1. Upload github
+2. https://share.streamlit.io/
