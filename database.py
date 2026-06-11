@@ -1,14 +1,21 @@
-import sqlite3
+import psycopg2
+from psycopg2.extras import DictCursor
 
-DB_NAME = "english_learning.db"
+# ĐIỀN CHUỖI URI KẾT NỐI SUPABASE CỦA BẠN VÀO ĐÂY
+DB_URI = "postgresql://postgres:KhaiHa.2705@db.xgixilajyehjdcauoleh.supabase.co:5432/postgres"
+
+def get_db_connection():
+    """Hàm tạo kết nối tới Supabase PostgreSQL"""
+    conn = psycopg2.connect(DB_URI, cursor_factory=DictCursor)
+    return conn
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
-    # 1. Bảng thành viên
+    # 1. Bảng thành viên (PostgreSQL dùng SERIAL thay vì AUTOINCREMENT)
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        user_id SERIAL PRIMARY KEY, 
         username TEXT UNIQUE, 
         password TEXT, 
         role TEXT, 
@@ -17,7 +24,7 @@ def init_db():
     
     # 2. Bảng bài đọc
     cursor.execute('''CREATE TABLE IF NOT EXISTS reading_lessons (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        id SERIAL PRIMARY KEY, 
         level TEXT, 
         title TEXT, 
         content TEXT, 
@@ -26,7 +33,7 @@ def init_db():
     
     # 3. Bảng từ vựng
     cursor.execute('''CREATE TABLE IF NOT EXISTS vocabulary (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        id SERIAL PRIMARY KEY, 
         vocab_date TEXT, 
         word TEXT UNIQUE, 
         word_type TEXT, 
@@ -45,9 +52,11 @@ def init_db():
         cursor.execute("""
             INSERT INTO users (username, password, role, allow_reading_part, allow_vocab_part) 
             VALUES ('admin', 'admin123', 'admin', 1, 1)
+            ON CONFLICT (username) DO NOTHING
         """)
         conn.commit()
-    except sqlite3.IntegrityError: 
-        pass
+    except Exception as e:
+        print(f"Lỗi khởi tạo Admin: {e}")
         
+    cursor.close()
     conn.close()

@@ -1,5 +1,15 @@
-Chạy local:
+I. Chạy local:
 streamlit run app.py
-Chạy webserver free:
-1. Upload github
-2. https://share.streamlit.io/
+pip install psycopg2-binary
+
+II. Chạy webserver free:
+1. Server: Upload github.com
+2. Database: https://supabase.com/
+2.1.Bạn truy cập vào Supabase.com và đăng ký/đăng nhập bằng tài khoản GitHub của bạn.
+2.2. Bấm New Project (Dự án mới) --> Đặt tên dự án (ví dụ: english4today) --> Tạo mật khẩu cho Database (bạn hãy lưu mật khẩu này lại nhé) --> Chọn khu vực (Region) là Singapore (hoặc gần Việt Nam nhất để kết nối nhanh) --> Bấm Create new project.
+2.3. Chờ khoảng 1-2 phút cho Supabase khởi tạo server xong.
+2.4. Ở thanh menu bên trái, bạn tìm biểu tượng bánh răng Project Settings --> Chọn mục Database.
+2.5. Kéo xuống phần Connection string, chọn tab URI. Chuỗi kết nối của bạn sẽ có dạng như thế này: postgresql://postgres.[id-du-an]:[mat-khau-cua-ban]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
+3. Framewrok server: https://share.streamlit.io/
+Khi deploy lên Streamlit Cloud hoặc GitHub, bạn hãy nhớ thêm một dòng psycopg2-binary vào file requirements.txt của bạn nhé.
+
