@@ -12,14 +12,20 @@ st.set_page_config(page_title="English4Today - Học Gây Nghiện", page_icon="
 
 # --- CUSTOM CSS ---
 st.markdown("""
-<style>
-    .main-header { font-size:34px !important; font-weight: 800; color: #1E3A8A; text-align: center; margin-bottom: 25px; }
-    .flashcard { background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); padding: 30px; border-radius: 20px; border-left: 8px solid #4F46E5; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    .story-card { background-color: #FFFBEB; padding: 18px; border-radius: 12px; border: 1px dashed #F59E0B; font-style: italic; }
-    .progress-text { font-size: 18px; font-weight: bold; color: #4F46E5; text-align: center; margin-bottom: 10px; }
-    .score-box { padding: 25px; border-radius: 20px; text-align: center; margin-top: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 2px solid #E2E8F0; }
-    .q-result { padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-weight: bold; font-size: 14px; display: inline-block; }
-</style>
+<script>
+    // Hàm phát âm toàn cục viết bằng JS chuẩn, không bị chặn bởi iframe
+    window.speakEnglishText = function(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); // Tắt giọng đọc cũ ngay lập tức
+            let utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.85;
+            window.speechSynthesis.speak(utterance);
+        } else {
+            alert("Trình duyệt của bạn không hỗ trợ phát âm!");
+        }
+    };
+</script>
 """, unsafe_allow_html=True)
 
 # Chạy khởi tạo database trên đám mây đầu luồng
@@ -124,8 +130,8 @@ if choice == "📚 Thử Thách Bài Đọc":
                 col1, col2 = st.columns([3, 1])
                 with col1: st.markdown(f"### 📖 {cur_lesson['title']}")
                 with col2:
-                    if st.button("🔊 Đọc Toàn Bộ Bài Văn", use_container_width=True, key=f"read_btn_{cur_lesson['id']}"):
-                        execute_speech(cur_lesson['content'])
+                    if st.button("🔊 Đọc Toàn Bộ Bài Văn", use_container_width=True):
+                        execute_speech(content)
                 
                 st.markdown(f"<div style='background-color: #F0FDF4; padding: 20px; border-radius: 12px; font-size: 18px; color: #1E293B; line-height: 1.7; border-left: 4px solid #10B981; margin-bottom: 15px;'>{cur_lesson['content']}</div>", unsafe_allow_html=True)
                 
@@ -210,7 +216,8 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                         <p style='font-size: 18px; margin-top:10px;'>🗣️ Phiên âm: <code>{v['phonetic']}</code> | <strong>Ý nghĩa: {v['meaning']}</strong></p>
                     </div>
                     """, unsafe_allow_html=True)
-                    if st.button("🔊 Phát Âm Từ Này", key=f"spk_{v['word']}"): execute_speech(v['word'])
+                    if st.button("🔊 Phát Âm Từ Này", key=f"spk_{word}"):
+                        execute_speech(word)
                 
                 col_l, col_r = st.columns([1, 1])
                 with col_l:
