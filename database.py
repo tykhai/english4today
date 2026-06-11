@@ -1,15 +1,12 @@
 import sqlite3
-import json
-from datetime import datetime
 
 DB_NAME = "english_learning.db"
 
-def get_connection():
-    return sqlite3.connect(DB_NAME)
-
 def init_db():
-    conn = get_connection()
+    conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    
+    # 1. Bảng thành viên
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY AUTOINCREMENT, 
         username TEXT UNIQUE, 
@@ -18,6 +15,7 @@ def init_db():
         allow_reading_part INTEGER DEFAULT 1, 
         allow_vocab_part INTEGER DEFAULT 1)''')
     
+    # 2. Bảng bài đọc
     cursor.execute('''CREATE TABLE IF NOT EXISTS reading_lessons (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         level TEXT, 
@@ -26,6 +24,7 @@ def init_db():
         grammar_points TEXT, 
         quiz TEXT)''')
     
+    # 3. Bảng từ vựng
     cursor.execute('''CREATE TABLE IF NOT EXISTS vocabulary (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         vocab_date TEXT, 
@@ -40,9 +39,15 @@ def init_db():
         context_easy TEXT, 
         context_medium TEXT, 
         context_hard TEXT)''')
+    
+    # Khởi tạo tài khoản Admin mặc định nếu chưa có
     try:
-        cursor.execute("INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin')")
+        cursor.execute("""
+            INSERT INTO users (username, password, role, allow_reading_part, allow_vocab_part) 
+            VALUES ('admin', 'admin123', 'admin', 1, 1)
+        """)
         conn.commit()
     except sqlite3.IntegrityError: 
         pass
+        
     conn.close()
