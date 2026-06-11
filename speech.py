@@ -1,25 +1,25 @@
 import streamlit as st
+import time  
 
 def execute_speech(text_to_speak):
-    """Sử dụng cơ chế chèn script trực tiếp vào cửa sổ cha để tránh bị chặn bởi Iframe Sandbox"""
-    if not text_to_speak:
-        return
-        
-    clean_text = text_to_speak.replace("'", "\\'").replace('"', '\\"').replace("\n", " ").replace("**", "")
+    # Bỏ các dấu nháy đơn và dọn dẹp ký tự xuống dòng để tránh lỗi chuỗi JavaScript
+    clean_text = text_to_speak.replace("'", "\\'").replace("\n", " ").replace("**", "")
+    
+    # Tạo một chuỗi thời gian ngẫu nhiên để đánh lừa trình duyệt luôn nạp lại iframe
+    timestamp = int(time.time() * 1000)
+    
     js_code = f"""
-    <script>
-        if ('speechSynthesis' in window) {{
+    <iframe srcdoc="
+        <script>
+            // Hủy các giọng đọc cũ đang chạy ẩn để tránh bị đè tiếng
             window.speechSynthesis.cancel();
-            setTimeout(() => {{
-                let msg = new SpeechSynthesisUtterance('{clean_text}');
-                msg.lang = 'en-US';
-                msg.rate = 0.85;
-                msg.volume = 1.0;
-                window.speechSynthesis.speak(msg);
-            }}, 50);
-        }} else {{
-            console.error("Trình duyệt không hỗ trợ SpeechSynthesis");
-        }}
-    </script>
+            
+            let u = new SpeechSynthesisUtterance('{clean_text}');
+            u.lang = 'en-US'; 
+            u.rate = 0.85;
+            
+            window.speechSynthesis.speak(u);
+        </script>
+    " style="display:none; width:0; height:0; border:none;" data-time="{timestamp}"></iframe>
     """
-    st.components.v1.html(js_code, height=0, width=0)
+    st.html(js_code)
