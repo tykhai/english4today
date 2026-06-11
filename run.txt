@@ -10,6 +10,20 @@ II. Chạy webserver free:
 2.3. Chờ khoảng 1-2 phút cho Supabase khởi tạo server xong.
 2.4. Ở thanh menu bên trái, bạn tìm biểu tượng bánh răng Project Settings --> Chọn mục Database.
 2.5. Kéo xuống phần Connection string, chọn tab URI. Chuỗi kết nối của bạn sẽ có dạng như thế này: postgresql://postgres.[id-du-an]:[mat-khau-cua-ban]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
+Ctr+K để tìm kiếm thông tin trên trang
+2.6 Cách chuyển connection popls:
+2.6.1. Bạn nhìn lên phía trên cùng hoặc quay lại mục Database Settings (bằng cách chọn Project Settings --> Database ở cột menu).
+2.6.2. Kéo lên phần Connection string (Chuỗi kết nối) nằm ở phía trên của trang này.
+2.6.3. Tại đây, bạn sẽ thấy có 2 lựa chọn (hoặc 2 tab) độc lập:
+2.6.3.1. Direct connection (Kết nối trực tiếp - dùng cổng 5432, dễ bị lỗi IPv6 trên Streamlit Cloud).
+2.6.3.2. Transaction / Session (Connection Pooler) (Kết nối qua Pooler - dùng cổng 6543 hoặc biến thể khác).
+2.7. Bạn hãy click vào lựa chọn Connection Pooler (hoặc tab Pooler).
+2.8. Lúc này, Supabase sẽ hiển thị một menu thả xuống (Dropdown) có tên là Mode. Bạn chọn chế độ là Session.
+2.9. Chọn định dạng chuỗi là URI (chuỗi bắt đầu bằng postgresql://...).
+2.10. Copy chuỗi đó, thay mật khẩu của bạn vào và cập nhật vào code là xong!
+postgresql://postgres.xgixilajyehjdcauoleh:KhaiHa.2705@aws-1-ap-south-1.pooler.supabase.com:5432/postgres
 3. Framewrok server: https://share.streamlit.io/
 Khi deploy lên Streamlit Cloud hoặc GitHub, bạn hãy nhớ thêm một dòng psycopg2-binary vào file requirements.txt của bạn nhé.
+
+
 
