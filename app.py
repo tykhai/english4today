@@ -58,16 +58,20 @@ def fetch_all_vocab_dates():
 @st.cache_data(ttl=600)
 def fetch_vocab_by_date(selected_date):
     """Tải từ vựng của một ngày cụ thể và lưu vào bộ nhớ đệm"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT word, word_type, phonetic, meaning, prefix, suffix, funny_story, other_forms, context_easy, context_medium, context_hard 
-        FROM vocabulary WHERE TRIM(vocab_date)=%s
-    """, (selected_date,))
-    vocabs = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return vocabs
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT word, word_type, phonetic, meaning, prefix, suffix, funny_story, other_forms, context_easy, context_medium, context_hard 
+            FROM vocabulary WHERE TRIM(vocab_date)=%s
+        """, (selected_date,))
+        vocabs = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return vocabs if vocabs is not None else [] # Đảm bảo luôn trả về danh sách
+    except Exception as e:
+        print(f"Lỗi tải từ vựng: {e}")
+        return [] # Nếu lỗi mạng/DB, trả về mảng rỗng để không sập giao diện
 # --- CÁC HÀM XỬ LÝ NGỮ LIỆU BỔ TRỢ ---
 def clean_and_bold_keyword(sentence, keyword):
     if not sentence: return ""
