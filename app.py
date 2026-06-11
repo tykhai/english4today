@@ -228,6 +228,10 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
             st.session_state.fill_blank_submitted = False
             vocabs = fetch_vocab_by_date(selected_date)
         
+        vocabs = fetch_vocab_by_date(selected_date)
+        if vocabs is None:
+            vocabs = []
+            
         total_words = len(vocabs)
         if total_words > 0:
             tab_learn, tab_game, tab_fill = st.tabs(["🌟 Chế Độ Học Thẻ Flashcard", "⚔️ Trận Chiến Trắc Nghiệm Nghĩa", "📝 Thử Thách Điền Từ Vào Câu"])
