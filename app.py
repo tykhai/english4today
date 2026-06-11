@@ -242,7 +242,9 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                         <p style='font-size: 18px; margin-top:10px;'>🗣️ Phiên âm: <code>{v['phonetic']}</code> | <strong>Ý nghĩa: {v['meaning']}</strong></p>
                     </div>
                     """, unsafe_allow_html=True)
-                    execute_speech(word, label="🔊 Phát Âm Từ Này")
+                    
+                    # --- ĐÃ SỬA TẠI ĐÂY: Truyền đúng v['word'] vào hàm đọc siêu tốc ---
+                    execute_speech(v['word'], label="🔊 Phát Âm Từ Này")
                 
                 col_l, col_r = st.columns([1, 1])
                 with col_l:
