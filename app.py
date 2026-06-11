@@ -130,8 +130,7 @@ if choice == "📚 Thử Thách Bài Đọc":
                 col1, col2 = st.columns([3, 1])
                 with col1: st.markdown(f"### 📖 {cur_lesson['title']}")
                 with col2:
-                    if st.button("🔊 Đọc Toàn Bộ Bài Văn", use_container_width=True):
-                        execute_speech(content)
+                    execute_speech(content, label="🔊 Đọc Toàn Bộ Bài Văn")
                 
                 st.markdown(f"<div style='background-color: #F0FDF4; padding: 20px; border-radius: 12px; font-size: 18px; color: #1E293B; line-height: 1.7; border-left: 4px solid #10B981; margin-bottom: 15px;'>{cur_lesson['content']}</div>", unsafe_allow_html=True)
                 
@@ -216,7 +215,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                         <p style='font-size: 18px; margin-top:10px;'>🗣️ Phiên âm: <code>{v['phonetic']}</code> | <strong>Ý nghĩa: {v['meaning']}</strong></p>
                     </div>
                     """, unsafe_allow_html=True)
-                    if st.button("🔊 Phát Âm Từ Này", key=f"spk_{word}"): execute_speech(word)
+                    execute_speech(word, label="🔊 Phát Âm Từ Này")
                 
                 col_l, col_r = st.columns([1, 1])
                 with col_l:
