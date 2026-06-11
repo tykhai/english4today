@@ -216,8 +216,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                         <p style='font-size: 18px; margin-top:10px;'>🗣️ Phiên âm: <code>{v['phonetic']}</code> | <strong>Ý nghĩa: {v['meaning']}</strong></p>
                     </div>
                     """, unsafe_allow_html=True)
-                    if st.button("🔊 Phát Âm Từ Này", key=f"spk_{word}"):
-                        execute_speech(word)
+                    if st.button("🔊 Phát Âm Từ Này", key=f"spk_{word}"): execute_speech(word)
                 
                 col_l, col_r = st.columns([1, 1])
                 with col_l:
