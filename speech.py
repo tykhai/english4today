@@ -1,25 +1,24 @@
 import streamlit as st
-import time  
 
-def execute_speech(text_to_speak):
-    # Bỏ các dấu nháy đơn và dọn dẹp ký tự xuống dòng để tránh lỗi chuỗi JavaScript
-    clean_text = text_to_speak.replace("'", "\\'").replace("\n", " ").replace("**", "")
+def execute_speech(text_to_speak, label="🔊 Nghe phát âm"):
+    # Dọn dẹp ký tự để chuỗi JavaScript không bị gãy
+    clean_text = text_to_speak.replace("'", "\\'").replace('"', '\\"').replace("\n", " ").replace("**", "")
     
-    # Tạo một chuỗi thời gian ngẫu nhiên để đánh lừa trình duyệt luôn nạp lại iframe
-    timestamp = int(time.time() * 1000)
-    
-    js_code = f"""
-    <iframe srcdoc="
-        <script>
-            // Hủy các giọng đọc cũ đang chạy ẩn để tránh bị đè tiếng
-            window.speechSynthesis.cancel();
-            
-            let u = new SpeechSynthesisUtterance('{clean_text}');
-            u.lang = 'en-US'; 
-            u.rate = 0.85;
-            
-            window.speechSynthesis.speak(u);
-        </script>
-    " style="display:none; width:0; height:0; border:none;" data-time="{timestamp}"></iframe>
+    # Tạo một nút bấm HTML tự tạo sự kiện đọc trực tiếp trên client (Không re-run app)
+    button_html = f"""
+    <button onclick="window.speakEnglishText('{clean_text}')" style="
+        width: 100%;
+        background-color: #4F46E5;
+        color: white;
+        padding: 10px 16px;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+        transition: all 0.2s;
+    " onmouseover="this.style.backgroundColor='#4338CA'" onmouseout="this.style.backgroundColor='#4F46E5'">
+        {label}
+    </button>
     """
-    st.html(js_code)
+    st.markdown(button_html, unsafe_allow_html=True)
