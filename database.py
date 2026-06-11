@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2.extras import DictCursor
 
 # ĐIỀN CHUỖI URI KẾT NỐI SUPABASE CỦA BẠN VÀO ĐÂY
-DB_URI = "DB_URI = "postgresql://postgres.xgixilajyehjdcauoleh:KhaiHa.2705@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+DB_URI = "postgresql://postgres.xgixilajyehjdcauoleh:KhaiHa.2705@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
 
 def get_db_connection():
     """Hàm tạo kết nối tới Supabase PostgreSQL"""
