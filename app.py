@@ -358,21 +358,83 @@ elif choice == "⚙️ Trung Tâm Admin":
     t1, t2, t3, t4 = st.tabs(["👥 Thành Viên", "📂 Sửa/Xóa Bài", "📝 Nạp Bài Đọc Mới", "🧠 Nạp Từ Vựng Lớn"])
     
     with t1:
-        st.subheader("Quản Lý Thành Viên")
-        with st.form("add_u"):
-            u = st.text_input("Tên tài khoản mới:")
-            p = st.text_input("Mật khẩu:")
-            r_p = st.checkbox("Quyền Phần 1", value=True)
-            v_p = st.checkbox("Quyền Phần 2", value=True)
-            if st.form_submit_button("Lưu Học Viên"):
-                if u and p:
-                    try:
+        st.subheader("👥 Quản Lý Thành Viên Hệ Thống")
+        
+        col_u1, col_u2 = st.columns([1.2, 2])
+        
+        # --- KHỐI THÊM HỌC VIÊN MỚI (Đã sửa lỗi hiển thị thông báo trùng) ---
+        with col_u1:
+            st.markdown("#### ➕ Thêm Học Viên Mới")
+            with st.form("add_new_user_form", clear_on_submit=True):
+                new_u = st.text_input("Tên tài khoản mới:").strip()
+                new_p = st.text_input("Mật khẩu tài khoản:", type="password").strip()
+                r_permission = st.checkbox("Quyền Học Phần 1 (Bài Đọc)", value=True)
+                v_permission = st.checkbox("Quyền Học Phần 2 (Từ Vựng)", value=True)
+                
+                if st.form_submit_button("Lưu Học Viên 💾", use_container_width=True):
+                    if not new_u or not new_p:
+                        st.error("❌ Vui lòng nhập đầy đủ Tài khoản và Mật khẩu!")
+                    else:
                         conn = sqlite3.connect(DB_NAME)
                         cursor = conn.cursor()
-                        cursor.execute("INSERT INTO users (username, password, role, allow_reading_part, allow_vocab_part) VALUES (?,?,'user',?,?)",(u.strip(), p.strip(), int(r_p), int(v_p)))
-                        conn.commit(); conn.close()
-                        st.success("Tạo thành công!"); st.rerun()
-                    except: st.error("Tài khoản đã tồn tại!")
+                        try:
+                            cursor.execute("""
+                                INSERT INTO users (username, password, role, allow_reading_part, allow_vocab_part) 
+                                VALUES (?, ?, 'user', ?, ?)
+                            """, (new_u, new_p, int(r_permission), int(v_permission)))
+                            conn.commit()
+                            st.success(f"🎉 Tạo tài khoản '{new_u}' thành công!")
+                            st.rerun()
+                        except sqlite3.IntegrityError:
+                            st.error("❌ Tài khoản này đã tồn tại trên hệ thống!")
+                        finally:
+                            conn.close()
+
+        # --- KHỐI DANH SÁCH & CẬP NHẬT/XÓA HỌC VIÊN (Bổ sung phần bị thiếu) ---
+        with col_u2:
+            st.markdown("#### 📋 Danh Sách Học Viên Hiện Có")
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id, username, password, allow_reading_part, allow_vocab_part, role FROM users WHERE role != 'admin'")
+            all_users = cursor.fetchall()
+            conn.close()
+            
+            if not all_users:
+                st.info("Chưa có học viên nào được tạo (ngoại trừ Admin mặc định).")
+            else:
+                for u_id, username, password, allow_r, allow_v, role in all_users:
+                    with st.container(border=True):
+                        # Giao diện hiển thị nhanh thông tin học viên
+                        st.markdown(f"👤 Học viên: **{username}** (MK: ` {password} `)")
+                        
+                        col_chk1, col_chk2, col_btn_del = st.columns([1, 1, 1])
+                        
+                        with col_chk1:
+                            # Cập nhật trực tiếp quyền Phần 1 khi tích chọn
+                            active_r = st.checkbox("Quyền Bài Đọc", value=bool(allow_r), key=f"user_r_{u_id}")
+                            if active_r != bool(allow_r):
+                                conn = sqlite3.connect(DB_NAME); cursor = conn.cursor()
+                                cursor.execute("UPDATE users SET allow_reading_part = ? WHERE user_id = ?", (int(active_r), u_id))
+                                conn.commit(); conn.close()
+                                st.rerun()
+                                
+                        with col_chk2:
+                            # Cập nhật trực tiếp quyền Phần 2 khi tích chọn
+                            active_v = st.checkbox("Quyền Từ Vựng", value=bool(allow_v), key=f"user_v_{u_id}")
+                            if active_v != bool(allow_v):
+                                conn = sqlite3.connect(DB_NAME); cursor = conn.cursor()
+                                cursor.execute("UPDATE users SET allow_vocab_part = ? WHERE user_id = ?", (int(active_v), u_id))
+                                conn.commit(); conn.close()
+                                st.rerun()
+                                
+                        with col_btn_del:
+                            # Nút bấm xóa học viên
+                            if st.button("Xóa Học Viên 🗑️", key=f"del_user_{u_id}", use_container_width=True, type="secondary"):
+                                conn = sqlite3.connect(DB_NAME); cursor = conn.cursor()
+                                cursor.execute("DELETE FROM users WHERE user_id = ?", (u_id,))
+                                conn.commit(); conn.close()
+                                st.success(f"🗑️ Đã xóa tài khoản {username}!")
+                                st.rerun()
     with t2:
         st.subheader("🛠️ Trung Tâm Biên Tập & Chỉnh Sửa Ngữ Liệu")
         col_m1, col_m2 = st.columns(2)
