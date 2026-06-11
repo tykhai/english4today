@@ -31,6 +31,43 @@ st.markdown("""
 # Chạy khởi tạo database trên đám mây đầu luồng
 init_db()
 
+# --- TỐI ƯU HÓA: BỘ LỌC CACHE DỮ LIỆU TỪ SUPABASE ---
+
+@st.cache_data(ttl=600)  # Lưu dữ liệu trên bộ nhớ đệm trong 10 phút (600 giây)
+def fetch_all_lessons():
+    """Tải toàn bộ bài đọc và lưu vào bộ nhớ đệm"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, level, title, content, grammar_points, quiz FROM reading_lessons")
+    lessons = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return lessons
+
+@st.cache_data(ttl=600)
+def fetch_all_vocab_dates():
+    """Tải danh sách ngày có từ vựng và lưu vào bộ nhớ đệm"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT TRIM(vocab_date) as vdate FROM vocabulary ORDER BY vdate DESC")
+    dates = [r['vdate'] for r in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+    return dates
+
+@st.cache_data(ttl=600)
+def fetch_vocab_by_date(selected_date):
+    """Tải từ vựng của một ngày cụ thể và lưu vào bộ nhớ đệm"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT word, word_type, phonetic, meaning, prefix, suffix, funny_story, other_forms, context_easy, context_medium, context_hard 
+        FROM vocabulary WHERE TRIM(vocab_date)=%s
+    """, (selected_date,))
+    vocabs = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return vocabs
 # --- CÁC HÀM XỬ LÝ NGỮ LIỆU BỔ TRỢ ---
 def clean_and_bold_keyword(sentence, keyword):
     if not sentence: return ""
@@ -110,10 +147,7 @@ with st.sidebar:
 # --- PHẦN 1: THỬ THÁCH BÀI ĐỌC ---
 if choice == "📚 Thử Thách Bài Đọc":
     st.markdown("<div class='main-header'>📚 Luyện Ngữ Liệu & Thử Thách Đọc Hiểu</div>", unsafe_allow_html=True)
-    conn = get_db_connection(); cursor = conn.cursor()
-    cursor.execute("SELECT id, level, title, content, grammar_points, quiz FROM reading_lessons")
-    lessons = cursor.fetchall()
-    cursor.close(); conn.close()
+    lessons = fetch_all_lessons()
 
     if not lessons: st.info("Chưa có bài đọc nào.")
     else:
@@ -178,10 +212,7 @@ if choice == "📚 Thử Thách Bài Đọc":
 # --- PHẦN 2: TỪ VỰNG THEO NGÀY ---
 elif choice == "🧠 Từ Vựng Theo Ngày":
     st.markdown("<div class='main-header'>🧠 Sổ Tay Từ Vựng Thông Minh Theo Ngày</div>", unsafe_allow_html=True)
-    conn = get_db_connection(); cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT TRIM(vocab_date) as vdate FROM vocabulary ORDER BY vdate DESC")
-    dates = [r['vdate'] for r in cursor.fetchall()]
-    cursor.close(); conn.close()
+    dates = fetch_all_vocab_dates()
 
     if not dates: st.info("Chưa có từ vựng.")
     else:
@@ -192,10 +223,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
             st.session_state.vocab_submitted = False
             st.session_state.fill_blank_submitted = False
             
-        conn = get_db_connection(); cursor = conn.cursor()
-        cursor.execute("SELECT word, word_type, phonetic, meaning, prefix, suffix, funny_story, other_forms, context_easy, context_medium, context_hard FROM vocabulary WHERE TRIM(vocab_date)=%s", (selected_date,))
-        vocabs = cursor.fetchall()
-        cursor.close(); conn.close()
+       vocabs = fetch_vocab_by_date(selected_date)
         
         total_words = len(vocabs)
         if total_words > 0:
@@ -319,6 +347,7 @@ elif choice == "⚙️ Trung Tâm Admin":
                                 VALUES (%s, %s, 'user', %s, %s)
                             """, (new_u, new_p, int(r_permission), int(v_permission)))
                             conn.commit()
+                            st.cache_data.clear()
                             st.success(f"🎉 Tạo tài khoản '{new_u}' thành công!")
                             st.rerun()
                         except: st.error("❌ Tài khoản này đã tồn tại trên hệ thống!")
@@ -343,20 +372,20 @@ elif choice == "⚙️ Trung Tâm Admin":
                             if active_r != bool(u['allow_reading_part']):
                                 conn = get_db_connection(); cursor = conn.cursor()
                                 cursor.execute("UPDATE users SET allow_reading_part = %s WHERE user_id = %s", (int(active_r), u['user_id']))
-                                conn.commit(); cursor.close(); conn.close(); st.rerun()
+                                conn.commit(); cursor.close(); conn.close(); st.cache_data.clear(); st.rerun()
                                 
                         with col_chk2:
                             active_v = st.checkbox("Quyền Từ Vựng", value=bool(u['allow_vocab_part']), key=f"user_v_{u['user_id']}")
                             if active_v != bool(u['allow_vocab_part']):
                                 conn = get_db_connection(); cursor = conn.cursor()
                                 cursor.execute("UPDATE users SET allow_vocab_part = %s WHERE user_id = %s", (int(active_v), u['user_id']))
-                                conn.commit(); cursor.close(); conn.close(); st.rerun()
+                                conn.commit(); cursor.close(); conn.close(); st.cache_data.clear(); st.rerun()
                                 
                         with col_btn_del:
                             if st.button("Xóa Học Viên 🗑️", key=f"del_user_{u['user_id']}", use_container_width=True):
                                 conn = get_db_connection(); cursor = conn.cursor()
                                 cursor.execute("DELETE FROM users WHERE user_id = %s", (u['user_id'],))
-                                conn.commit(); cursor.close(); conn.close(); st.success("Đã xóa!"); st.rerun()
+                                conn.commit(); cursor.close(); conn.close(); st.cache_data.clear(); st.success("Đã xóa!"); st.rerun()
     with t2:
         st.subheader("🛠️ Trung Tâm Biên Tập & Chỉnh Sửa Ngữ Liệu")
         col_m1, col_m2 = st.columns(2)
@@ -377,12 +406,12 @@ elif choice == "⚙️ Trung Tâm Admin":
                                 if st.form_submit_button("Cập nhật ngay 💾"):
                                     conn = get_db_connection(); cursor = conn.cursor()
                                     cursor.execute("UPDATE reading_lessons SET title=%s, level=%s, content=%s WHERE id=%s", (edit_title, edit_lvl, edit_content, r['id']))
-                                    conn.commit(); cursor.close(); conn.close(); st.success("Đã cập nhật!"); st.rerun()
+                                    conn.commit(); cursor.close(); conn.close(); st.cache_data.clear(); st.success("Đã cập nhật!"); st.rerun()
                     with col_btn2:
                         if st.button("Xóa bài 🗑️", key=f"del_read_{r['id']}", use_container_width=True):
                             conn = get_db_connection(); cursor = conn.cursor()
                             cursor.execute("DELETE FROM reading_lessons WHERE id=%s", (r['id'],))
-                            conn.commit(); cursor.close(); conn.close(); st.success("Đã xóa!"); st.rerun()
+                            conn.commit(); cursor.close(); conn.close(); st.cache_data.clear(); st.success("Đã xóa!"); st.rerun()
         with col_m2:
             st.markdown("#### 🧠 Quản lý Từ Vựng")
             conn = get_db_connection(); cursor = conn.cursor()
@@ -400,12 +429,12 @@ elif choice == "⚙️ Trung Tâm Admin":
                                 if st.form_submit_button("Lưu thay đổi 💾"):
                                     conn = get_db_connection(); cursor = conn.cursor()
                                     cursor.execute("UPDATE vocabulary SET word=%s, meaning=%s, funny_story=%s WHERE id=%s", (edit_word, edit_meaning, edit_story, v['id']))
-                                    conn.commit(); cursor.close(); conn.close(); st.success("Đã cập nhật!"); st.rerun()
+                                    conn.commit(); cursor.close(); conn.close();st.cache_data.clear(); st.success("Đã cập nhật!"); st.rerun()
                     with col_vbtn2:
                         if st.button("Xóa từ 🗑️", key=f"del_voc_{v['id']}", use_container_width=True):
                             conn = get_db_connection(); cursor = conn.cursor()
                             cursor.execute("DELETE FROM vocabulary WHERE id=%s", (v['id'],))
-                            conn.commit(); cursor.close(); conn.close(); st.success("Đã xóa!"); st.rerun()
+                            conn.commit(); cursor.close(); conn.close();st.cache_data.clear(); st.success("Đã xóa!"); st.rerun()
     with t3:
         st.subheader("Nạp Bài Đọc Mới")
         js_r = st.text_area("Dán JSON bài đọc tại đây:", height=200)
@@ -416,7 +445,7 @@ elif choice == "⚙️ Trung Tâm Admin":
                     conn = get_db_connection(); cursor = conn.cursor()
                     cursor.execute("INSERT INTO reading_lessons (level, title, content, grammar_points, quiz) VALUES (%s,%s,%s,%s,%s)",
                                    (d.get("level","A1"), d.get("title",""), d.get("content",""), json.dumps(d.get("grammar_points",[]), ensure_ascii=False), json.dumps(d.get("quiz",[]), ensure_ascii=False)))
-                    conn.commit(); cursor.close(); conn.close(); st.success("Đã nạp bài đọc!"); st.rerun()
+                    conn.commit(); cursor.close(); conn.close(); st.cache_data.clear(); st.success("Đã nạp bài đọc!"); st.rerun()
                 except Exception as e: st.error(f"Lỗi JSON: {e}")
     with t4:
         st.subheader("Nạp Từ Vựng Lớn")
@@ -444,5 +473,5 @@ elif choice == "⚙️ Trung Tâm Admin":
                                 context_medium = EXCLUDED.context_medium,
                                 context_hard = EXCLUDED.context_hard
                         """, (item.get('date', datetime.now().strftime('%Y-%m-%d')), item['word'], item.get('word_type',''), item['phonetic'], item['meaning'], item.get('prefix',''), item.get('suffix',''), item['funny_story'], item.get('other_forms',''), item['context_easy'], item['context_medium'], item['context_hard']))
-                    conn.commit(); cursor.close(); conn.close(); st.success("Đã nạp bộ từ vựng mới!"); st.rerun()
+                    conn.commit(); cursor.close(); conn.close(); st.cache_data.clear(); st.success("Đã nạp bộ từ vựng mới!"); st.rerun()
                 except Exception as e: st.error(f"Lỗi JSON: {e}")
