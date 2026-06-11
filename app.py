@@ -222,8 +222,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
             st.session_state.current_date = selected_date
             st.session_state.vocab_submitted = False
             st.session_state.fill_blank_submitted = False
-            
-       vocabs = fetch_vocab_by_date(selected_date)
+            vocabs = fetch_vocab_by_date(selected_date)
         
         total_words = len(vocabs)
         if total_words > 0:
