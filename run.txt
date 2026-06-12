@@ -1,6 +1,7 @@
 I. Chạy local:
 streamlit run app.py
 pip install psycopg2-binary
+pip install gTTS
 
 II. Chạy webserver free:
 1. Server: Upload github.com
