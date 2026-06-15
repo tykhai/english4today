@@ -3,6 +3,7 @@ import sqlite3
 import json
 import re
 from datetime import datetime
+from streamlit_mic_recorder import mic_recorder
 
 # --- IMPORT TỪ CÁC LỚP ĐÃ TÁCH ---
 from database import init_db, DB_NAME
@@ -20,6 +21,7 @@ st.markdown("""
     .progress-text { font-size: 18px; font-weight: bold; color: #4F46E5; text-align: center; margin-bottom: 10px; }
     .score-box { padding: 25px; border-radius: 20px; text-align: center; margin-top: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 2px solid #E2E8F0; }
     .q-result { padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-weight: bold; font-size: 14px; display: inline-block; }
+    .voice-status { padding: 12px; border-radius: 10px; background-color: #EFF6FF; border: 1px solid #BFDBFE; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -45,6 +47,7 @@ states = {
     "user": None, "vocab_index": 0, "current_date": "",
     "reading_submitted": False, "vocab_submitted": False, 
     "vocab_rev_submitted": False, "fill_blank_submitted": False,
+    "text_input_en_submitted": False, "text_input_vi_submitted": False,
     "trigger_balloons": False, "trigger_snow": False
 }
 for key, value in states.items():
@@ -181,6 +184,8 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
             st.session_state.vocab_submitted = False
             st.session_state.vocab_rev_submitted = False
             st.session_state.fill_blank_submitted = False
+            st.session_state.text_input_en_submitted = False
+            st.session_state.text_input_vi_submitted = False
             
         conn = sqlite3.connect(DB_NAME)
         vocabs = conn.execute("SELECT word, word_type, phonetic, meaning, prefix, suffix, funny_story, other_forms, context_easy, context_medium, context_hard FROM vocabulary WHERE TRIM(vocab_date)=?", (selected_date,)).fetchall()
@@ -188,9 +193,16 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
         
         total_words = len(vocabs)
         if total_words > 0:
-            tab_learn, tab_game, tab_game_rev, tab_fill = st.tabs(["🌟 Thẻ Flashcard", "⚔️ Trắc Nghiệm (Anh -> Việt)", "🔄 Trắc Nghiệm (Việt -> Anh)", "📝 Điền Từ Vào Chỗ Trống"])
+            tab_learn, tab_game, tab_game_rev, tab_input_en, tab_input_vi, tab_fill = st.tabs([
+                "🌟 Thẻ Flashcard", 
+                "⚔️ Trắc Nghiệm (A -> V)", 
+                "🔄 Trắc Nghiệm (V -> A)", 
+                "⌨️ Gõ Từ (V -> A)",
+                "📝 Gõ Nghĩa (A -> V)",
+                "✏️ Chỗ Trống"
+            ])
             
-            # TAB 1: FLASHCARD LEARNING
+            # TAB 1: FLASHCARD LEARNING + FIX GHI ÂM TRỰC QUAN
             with tab_learn:
                 idx = st.session_state.vocab_index
                 st.markdown(f"<div class='progress-text'>⚡ TIẾN ĐỘ: Từ {idx+1} / {total_words}</div>", unsafe_allow_html=True)
@@ -199,9 +211,26 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                 
                 st.markdown(f"<div class='flashcard'><span style='font-size:36px; font-weight:bold; color:#4F46E5;'>{word}</span> <span style='background-color:#EEF2F6; color:#64748B; font-size:14px; padding:4px 8px; border-radius:6px;'>{w_type.upper()}</span><p style='font-size: 18px; margin-top:10px;'>🗣️ Phiên âm: <code>{phonetic}</code> | <strong>Ý nghĩa: {meaning}</strong></p></div>", unsafe_allow_html=True)
                 
-                if st.button("🔊 Phát Âm Từ Này", key=f"spk_{word}"):
-                    execute_speech(word)
-                
+                col_audio1, col_audio2 = st.columns(2)
+                with col_audio1:
+                    if st.button("🔊 Nghe Phát Âm Mẫu", key=f"spk_{word}", use_container_width=True):
+                        execute_speech(word)
+                        
+                with col_audio2:
+                    st.write("🎙️ **Ghi âm kiểm tra luồng nói:**")
+                    audio_data = mic_recorder(
+                        start_prompt="🔴 Bấm Nói",
+                        stop_prompt="⏹️ Dừng & Lưu",
+                        key=f"rec_v2_{word}_{idx}"
+                    )
+                    
+                    if audio_data:
+                        st.markdown("<div class='voice-status'>", unsafe_allow_html=True)
+                        st.audio(audio_data['bytes'], format='audio/wav')
+                        st.success(f"💯 Đã nhận luồng hơi phát âm cho từ **{word}**! Trình duyệt ghi nhận sóng âm thành công.")
+                        st.markdown("</div>", unsafe_allow_html=True)
+
+                st.markdown("---")
                 col_l, col_r = st.columns([1, 1])
                 with col_l:
                     st.markdown(f"<div class='story-card'><strong>💡 Mẹo kể chuyện liên tưởng:</strong><br><br>{story}</div>", unsafe_allow_html=True)
@@ -249,7 +278,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                     if st.button("🔄 Khởi Động Lại Trận Chiến (Xuôi)", use_container_width=True):
                         st.session_state.vocab_submitted = False; st.rerun()
 
-            # TAB 3: NEW! GAME NGƯỢC (VIỆT -> ANH)
+            # TAB 3: GAME NGƯỢC (VIỆT -> ANH)
             with tab_game_rev:
                 st.markdown("### 🔄 Thử Thách Tìm Từ Tiếng Anh Đúng")
                 game_rev_answers = []
@@ -276,7 +305,61 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                     if st.button("🔄 Khởi Động Lại Trận Chiến (Ngược)", use_container_width=True):
                         st.session_state.vocab_rev_submitted = False; st.rerun()
 
-            # TAB 4: FILL IN BLANK
+            # TAB 4: NEW! GÕ BÀN PHÍM (VIỆT -> ANH)
+            with tab_input_en:
+                st.markdown("### ⌨️ Đấu Trường Gõ Từ - Nhìn Nghĩa Tiếng Việt Đoán Từ Tiếng Anh")
+                input_en_answers = []
+                for idx, v_item in enumerate(vocabs):
+                    correct_word, target_meaning = v_item[0], v_item[3]
+                    with st.container(border=True):
+                        st.markdown(f"🎯 Câu số {idx+1}: Gợi ý nghĩa: **\"{target_meaning}\"**")
+                        u_text_en = st.text_input("Gõ từ tiếng Anh chuẩn xác tại đây:", key=f"txt_en_{correct_word}", disabled=st.session_state.text_input_en_submitted)
+                        input_en_answers.append((u_text_en.strip(), correct_word))
+                        if st.session_state.text_input_en_submitted:
+                            render_result(u_text_en.strip().lower() == correct_word.lower(), f"Từ viết đúng là: **{correct_word}**")
+                
+                st.markdown("---")
+                if not st.session_state.text_input_en_submitted:
+                    if st.button("🚀 Chấm Điểm Bài Gõ Tiếng Anh", use_container_width=True):
+                        en_score = sum(1 for u, c in input_en_answers if u.lower() == c.lower())
+                        if en_score == total_words: st.session_state.trigger_balloons = True
+                        st.session_state.text_input_en_submitted = True; st.rerun()
+                else:
+                    en_score = sum(1 for u, c in input_en_answers if u.lower() == c.lower())
+                    st.markdown(f"<div class='score-box'><h3>📊 KẾT QUẢ KIỂM TRA ĐỘ CHÍNH XÁC CHÍNH TẢ</h3><p style='font-size: 24px; font-weight: 700; color: #10B981;'>Bạn viết chuẩn: {en_score} / {total_words} Từ</p></div>", unsafe_allow_html=True)
+                    if st.button("🔄 Thử Sức Lại Phần Gõ Tiếng Anh", use_container_width=True):
+                        st.session_state.text_input_en_submitted = False; st.rerun()
+
+            # TAB 5: NEW! GÕ BÀN PHÍM (ANH -> VIỆT)
+            with tab_input_vi:
+                st.markdown("### 📝 Thử Thách Nhập Nghĩa Tiếng Việt")
+                input_vi_answers = []
+                for idx, v_item in enumerate(vocabs):
+                    target_word, correct_meaning = v_item[0], v_item[3]
+                    with st.container(border=True):
+                        st.markdown(f"🎯 Từ số {idx+1}: **{target_word}**")
+                        u_text_vi = st.text_input("Nhập ý nghĩa Tiếng Việt tương ứng:", key=f"txt_vi_{target_word}", disabled=st.session_state.text_input_vi_submitted)
+                        
+                        # Giải thuật kiểm tra thông minh: so khớp từ khóa chính
+                        clean_u = u_text_vi.strip().lower()
+                        clean_c = correct_meaning.strip().lower()
+                        is_match = any(word in clean_c for word in clean_u.split()) if clean_u else False
+                        
+                        input_vi_answers.append((is_match, correct_meaning))
+                        if st.session_state.text_input_vi_submitted:
+                            render_result(is_match, f"Nghĩa hệ thống lưu: *{correct_meaning}*")
+                
+                st.markdown("---")
+                if not st.session_state.text_input_vi_submitted:
+                    if st.button("🚀 Kiểm Tra Giải Nghĩa Tiếng Việt", use_container_width=True):
+                        st.session_state.text_input_vi_submitted = True; st.rerun()
+                else:
+                    vi_score = sum(1 for is_match, _ in input_vi_answers if is_match)
+                    st.markdown(f"<div class='score-box'><h3>📊 TỔNG KẾT ĐIỂM GIẢI NGHĨA</h3><p style='font-size: 24px; font-weight: 700; color: #3B82F6;'>Giải nghĩa khớp: {vi_score} / {total_words} Từ</p></div>", unsafe_allow_html=True)
+                    if st.button("🔄 Thử Sức Lại Phần Gõ Tiếng Việt", use_container_width=True):
+                        st.session_state.text_input_vi_submitted = False; st.rerun()
+
+            # TAB 6: FILL IN BLANK
             with tab_fill:
                 st.markdown("### 📝 Thử Thách Điền Từ Vào Chỗ Trống")
                 input_answers = []

@@ -1,2 +1,4 @@
 streamlit
 gTTS
+streamlit-mic-recorder
+azure-cognitiveservices-speech
