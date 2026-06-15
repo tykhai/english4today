@@ -32,6 +32,27 @@ def clean_and_bold_keyword(sentence, keyword):
     if not sentence: return ""
     return re.sub(re.escape(keyword), f"**{keyword}**", sentence.replace("**", "").replace("*", ""), flags=re.IGNORECASE)
 
+def clean_and_underline_keywords(sentence, keywords_list):
+    """
+    Hàm nâng cấp: Nhận vào một danh sách các từ vựng và tiến hành gạch chân
+    tất cả các từ đó nếu chúng xuất hiện trong đoạn văn.
+    """
+    if not sentence: return ""
+    clean_text = sentence.replace("**", "").replace("*", "")
+    if not keywords_list:
+        return clean_text
+        
+    # Sắp xếp từ dài lên trước để tránh việc từ ngắn tranh chấp làm lỗi tag HTML của từ dài
+    sorted_keywords = sorted(list(set(keywords_list)), key=len, reverse=True)
+    
+    for kw in sorted_keywords:
+        if kw and kw.strip():
+            # Sử dụng re.sub với căn lề biên từ (\b) để gạch chân chính xác từ độc lập
+            pattern = re.compile(r'\b' + re.escape(kw.strip()) + r'\b', re.IGNORECASE)
+            clean_text = pattern.sub(f"<u>\g<0></u>", clean_text)
+            
+    return clean_text
+
 def hide_keyword_for_exercise(sentence, keyword):
     if not sentence: return ""
     return re.sub(re.escape(keyword), "_______", sentence.replace("**", "").replace("*", ""), flags=re.IGNORECASE)
@@ -104,6 +125,8 @@ if choice == "📚 Thử Thách Bài Đọc":
     st.markdown("<div class='main-header'>📚 Luyện Ngữ Liệu & Thử Thách Đọc Hiểu</div>", unsafe_allow_html=True)
     conn = sqlite3.connect(DB_NAME)
     lessons = conn.execute("SELECT id, level, title, content, grammar_points, quiz FROM reading_lessons").fetchall()
+    # Lấy toàn bộ danh sách các từ vựng có sẵn trong DB để làm từ khóa gạch chân hằng ngày
+    all_vocab_words = [r[0] for r in conn.execute("SELECT word FROM vocabulary").fetchall()]
     conn.close()
 
     if not lessons: 
@@ -124,7 +147,9 @@ if choice == "📚 Thử Thách Bài Đọc":
                     if st.button("🔊 Đọc Toàn Bộ Bài Văn", use_container_width=True, key=f"read_btn_{l_id}"):
                         execute_speech(content)
                 
-                st.markdown(f"<div style='background-color: #F0FDF4; padding: 20px; border-radius: 12px; font-size: 18px; color: #1E293B; line-height: 1.7; border-left: 4px solid #10B981; margin-bottom: 15px;'>{content}</div>", unsafe_allow_html=True)
+                # --- ÁP DỤNG QUÉT VÀ GẠCH CHÂN TỪ VỰNG TỰ ĐỘNG TẠI ĐÂY ---
+                underlined_content = clean_and_underline_keywords(content, all_vocab_words)
+                st.markdown(f"<div style='background-color: #F0FDF4; padding: 20px; border-radius: 12px; font-size: 18px; color: #1E293B; line-height: 1.7; border-left: 4px solid #10B981; margin-bottom: 15px;'>{underlined_content}</div>", unsafe_allow_html=True)
                 
                 with st.expander("💡 Xem Cấu Trúc Ngữ Pháp Chuyên Sâu"):
                     if grammar_points:
@@ -202,7 +227,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                 "✏️ Chỗ Trống"
             ])
             
-            # TAB 1: FLASHCARD LEARNING + FIX GHI ÂM TRỰC QUAN
+            # TAB 1: FLASHCARD LEARNING
             with tab_learn:
                 idx = st.session_state.vocab_index
                 st.markdown(f"<div class='progress-text'>⚡ TIẾN ĐỘ: Từ {idx+1} / {total_words}</div>", unsafe_allow_html=True)
@@ -305,7 +330,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                     if st.button("🔄 Khởi Động Lại Trận Chiến (Ngược)", use_container_width=True):
                         st.session_state.vocab_rev_submitted = False; st.rerun()
 
-            # TAB 4: NEW! GÕ BÀN PHÍM (VIỆT -> ANH)
+            # TAB 4: GÕ BÀN PHÍM (VIỆT -> ANH)
             with tab_input_en:
                 st.markdown("### ⌨️ Đấu Trường Gõ Từ - Nhìn Nghĩa Tiếng Việt Đoán Từ Tiếng Anh")
                 input_en_answers = []
@@ -330,7 +355,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                     if st.button("🔄 Thử Sức Lại Phần Gõ Tiếng Anh", use_container_width=True):
                         st.session_state.text_input_en_submitted = False; st.rerun()
 
-            # TAB 5: NEW! GÕ BÀN PHÍM (ANH -> VIỆT)
+            # TAB 5: GÕ BÀN PHÍM (ANH -> VIỆT)
             with tab_input_vi:
                 st.markdown("### 📝 Thử Thách Nhập Nghĩa Tiếng Việt")
                 input_vi_answers = []
