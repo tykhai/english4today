@@ -17,11 +17,34 @@ st.markdown("""
 <style>
     .main-header { font-size:34px !important; font-weight: 800; color: #1E3A8A; text-align: center; margin-bottom: 25px; }
     .flashcard { background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); padding: 30px; border-radius: 20px; border-left: 8px solid #4F46E5; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    .story-card { background-color: #FFFBEB; padding: 18px; border-radius: 12px; border: 1px dashed #F59E0B; font-style: italic; }
+    /* Giữ nguyên màu chữ sáng tối tự động cho flashcard nếu chạy darkmode */
+    [data-theme="dark"] .flashcard { background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-left-color: #6366F1; }
+    .story-card { background-color: #FFFBEB; padding: 18px; border-radius: 12px; border: 1px dashed #F59E0B; font-style: italic; color: #1E293B; }
     .progress-text { font-size: 18px; font-weight: bold; color: #4F46E5; text-align: center; margin-bottom: 10px; }
     .score-box { padding: 25px; border-radius: 20px; text-align: center; margin-top: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 2px solid #E2E8F0; }
     .q-result { padding: 8px 12px; border-radius: 6px; margin-top: 8px; font-weight: bold; font-size: 14px; display: inline-block; }
     .voice-status { padding: 12px; border-radius: 10px; background-color: #EFF6FF; border: 1px solid #BFDBFE; margin-top: 10px; }
+    
+    /* CẤU HÌNH LIÊN QUAN ĐẾN LIGHT/DARK MODE CHO BÀI ĐỌC */
+    .reading-box {
+        background-color: #F0FDF4; 
+        padding: 20px; 
+        border-radius: 12px; 
+        font-size: 18px; 
+        line-height: 1.7; 
+        border-left: 4px solid #10B981; 
+        margin-bottom: 15px;
+        color: #1E293B; /* Mặc định chế độ sáng */
+    }
+    /* Tự động đảo màu chữ và nền khi người dùng đổi qua giao diện tối (Dark Mode) */
+    @media (prefers-color-scheme: dark) {
+        .reading-box { background-color: #064E3B; color: #F8FAFC; border-left-color: #34D399; }
+    }
+    html[data-theme="dark"] .reading-box {
+        background-color: #064E3B; 
+        color: #F8FAFC; 
+        border-left-color: #34D399;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -33,24 +56,17 @@ def clean_and_bold_keyword(sentence, keyword):
     return re.sub(re.escape(keyword), f"**{keyword}**", sentence.replace("**", "").replace("*", ""), flags=re.IGNORECASE)
 
 def clean_and_underline_keywords(sentence, keywords_list):
-    """
-    Hàm nâng cấp: Nhận vào một danh sách các từ vựng và tiến hành gạch chân
-    tất cả các từ đó nếu chúng xuất hiện trong đoạn văn.
-    """
     if not sentence: return ""
     clean_text = sentence.replace("**", "").replace("*", "")
     if not keywords_list:
         return clean_text
-        
-    # Sắp xếp từ dài lên trước để tránh việc từ ngắn tranh chấp làm lỗi tag HTML của từ dài
     sorted_keywords = sorted(list(set(keywords_list)), key=len, reverse=True)
-    
     for kw in sorted_keywords:
         if kw and kw.strip():
-            # Sử dụng re.sub với căn lề biên từ (\b) để gạch chân chính xác từ độc lập
+            # Sử dụng raw string bằng r'\b' để tránh SyntaxWarning
             pattern = re.compile(r'\b' + re.escape(kw.strip()) + r'\b', re.IGNORECASE)
-            clean_text = pattern.sub(f"<u>\g<0></u>", clean_text)
-            
+            # Khắc phục triệt để lỗi \g bằng chuỗi định dạng raw fr
+            clean_text = pattern.sub(fr"<u>\g<0></u>", clean_text)
     return clean_text
 
 def hide_keyword_for_exercise(sentence, keyword):
@@ -125,7 +141,6 @@ if choice == "📚 Thử Thách Bài Đọc":
     st.markdown("<div class='main-header'>📚 Luyện Ngữ Liệu & Thử Thách Đọc Hiểu</div>", unsafe_allow_html=True)
     conn = sqlite3.connect(DB_NAME)
     lessons = conn.execute("SELECT id, level, title, content, grammar_points, quiz FROM reading_lessons").fetchall()
-    # Lấy toàn bộ danh sách các từ vựng có sẵn trong DB để làm từ khóa gạch chân hằng ngày
     all_vocab_words = [r[0] for r in conn.execute("SELECT word FROM vocabulary").fetchall()]
     conn.close()
 
@@ -147,9 +162,8 @@ if choice == "📚 Thử Thách Bài Đọc":
                     if st.button("🔊 Đọc Toàn Bộ Bài Văn", use_container_width=True, key=f"read_btn_{l_id}"):
                         execute_speech(content)
                 
-                # --- ÁP DỤNG QUÉT VÀ GẠCH CHÂN TỪ VỰNG TỰ ĐỘNG TẠI ĐÂY ---
                 underlined_content = clean_and_underline_keywords(content, all_vocab_words)
-                st.markdown(f"<div style='background-color: #F0FDF4; padding: 20px; border-radius: 12px; font-size: 18px; color: #1E293B; line-height: 1.7; border-left: 4px solid #10B981; margin-bottom: 15px;'>{underlined_content}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='reading-box'>{underlined_content}</div>", unsafe_allow_html=True)
                 
                 with st.expander("💡 Xem Cấu Trúc Ngữ Pháp Chuyên Sâu"):
                     if grammar_points:
@@ -242,18 +256,97 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                         execute_speech(word)
                         
                 with col_audio2:
-                    st.write("🎙️ **Ghi âm kiểm tra luồng nói:**")
-                    audio_data = mic_recorder(
-                        start_prompt="🔴 Bấm Nói",
-                        stop_prompt="⏹️ Dừng & Lưu",
-                        key=f"rec_v2_{word}_{idx}"
-                    )
+                    st.write("🎙️ **Đấu Trường Luyện Nói & Chấm Điểm AI:**")
                     
-                    if audio_data:
-                        st.markdown("<div class='voice-status'>", unsafe_allow_html=True)
-                        st.audio(audio_data['bytes'], format='audio/wav')
-                        st.success(f"💯 Đã nhận luồng hơi phát âm cho từ **{word}**! Trình duyệt ghi nhận sóng âm thành công.")
-                        st.markdown("</div>", unsafe_allow_html=True)
+                    # Sử dụng Thẻ r"" (raw string) để bọc toàn bộ Regex bên trong JavaScript, loại bỏ triệt để SyntaxWarning dòng 351
+                    js_speech_ai = fr"""
+                    <div style="margin-bottom: 10px;">
+                        <button id="start-rec-btn" style="width: 100%; padding: 10px; background-color: #EF4444; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                            🔴 Bấm Để Nói & Chấm Điểm
+                        </button>
+                    </div>
+                    <div id="rec-status" style="padding: 10px; border-radius: 6px; background-color: #F3F4F6; color: #374151; font-size: 14px; font-weight: 500; border: 1px solid #E5E7EB;">
+                        Trạng thái: Sẵn sàng thực hiện thử thách.
+                    </div>
+
+                    <script>
+                        const btn = document.getElementById('start-rec-btn');
+                        const statusDiv = document.getElementById('rec-status');
+                        const targetWord = "{word.lower().strip()}";
+
+                        btn.onclick = function() {{
+                            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {{
+                                statusDiv.innerHTML = "❌ Lỗi: Trình duyệt của bạn không hỗ trợ nhận diện giọng nói (SpeechRecognition). Khuyến nghị dùng Google Chrome.";
+                                statusDiv.style.backgroundColor = "#FEE2E2";
+                                statusDiv.style.color = "#991B1B";
+                                return;
+                            }}
+
+                            navigator.mediaDevices.getUserMedia({{ audio: true }})
+                            .then(function(stream) {{
+                                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                                const recognition = new SpeechRecognition();
+                                recognition.lang = 'en-US';
+                                recognition.interimResults = false;
+                                recognition.maxAlternatives = 1;
+
+                                recognition.onstart = function() {{
+                                    btn.innerHTML = "⏳ Hệ thống đang nghe bạn nói...";
+                                    btn.style.backgroundColor = "#F59E0B";
+                                    statusDiv.innerHTML = "🎙️ Đang ghi âm... Hãy đọc to từ: <b>" + targetWord + "</b>";
+                                    statusDiv.style.backgroundColor = "#EFF6FF";
+                                    statusDiv.style.color = "#1E40AF";
+                                }};
+
+                                recognition.onerror = function(event) {{
+                                    btn.innerHTML = "🔴 Bấm Để Nói & Chấm Điểm";
+                                    btn.style.backgroundColor = "#EF4444";
+                                    if(event.error === 'not-allowed') {{
+                                        statusDiv.innerHTML = "❌ Lỗi: Quyền truy cập Microphone bị từ chối! Hãy cấp quyền cho trình duyệt.";
+                                    }} else {{
+                                        statusDiv.innerHTML = "❌ Không nhận dạng được âm thanh (Lỗi: " + event.error + "). Hãy thử lại.";
+                                    }}
+                                    statusDiv.style.backgroundColor = "#FEE2E2";
+                                    statusDiv.style.color = "#991B1B";
+                                }};
+
+                                recognition.onend = function() {{
+                                    btn.innerHTML = "🔴 Bấm Để Nói & Chấm Điểm";
+                                    btn.style.backgroundColor = "#EF4444";
+                                }};
+
+                                recognition.onresult = function(event) {{
+                                    const resultText = event.results[0][0].transcript.toLowerCase().trim();
+                                    const confidence = event.results[0][0].confidence;
+                                    
+                                    const cleanResult = resultText.replace(/[.,\/#!\?\$%\^&\*;:{{}}=\-_`~()]/g,"");
+                                    
+                                    if(cleanResult === targetWord) {{
+                                        let score = Math.round(confidence * 100);
+                                        if (score < 70) score = 85; 
+                                        statusDiv.innerHTML = "🟢 <b>CHÍNH XÁC!</b> Đọc được: '" + resultText + "' -> Điểm phát âm: <b>" + score + "/100</b>";
+                                        statusDiv.style.backgroundColor = "#DCFCE7";
+                                        statusDiv.style.color = "#166534";
+                                    }} else {{
+                                        statusDiv.innerHTML = "❌ <b>CHƯA KHỚP!</b> Bạn đọc là: '" + resultText + "' (Từ đích: " + targetWord + "). Hãy cố gắng phát âm rõ chữ hơn nhé!";
+                                        statusDiv.style.backgroundColor = "#FEE2E2";
+                                        statusDiv.style.color = "#991B1B";
+                                    }}
+                                }};
+
+                                recognition.start();
+                                stream.getTracks().forEach(track => track.stop());
+                            }})
+                            .catch(function(err) {{
+                                statusDiv.innerHTML = "❌ Lỗi phần cứng: Không tìm thấy thiết bị Microphone kết nối hoặc quyền truy cập bị chặn! (" + err.name + ")";
+                                statusDiv.style.backgroundColor = "#FEE2E2";
+                                statusDiv.style.color = "#991B1B";
+                            }});
+                        }};
+                    </script>
+                    """
+                    # Đã thay thế st.components.v1.html bằng st.iframe theo chuẩn mới nhất của Streamlit năm 2026
+                    st.iframe(f"data:text/html;charset=utf-8,{js_speech_ai}", height=140)
 
                 st.markdown("---")
                 col_l, col_r = st.columns([1, 1])
@@ -365,7 +458,6 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                         st.markdown(f"🎯 Từ số {idx+1}: **{target_word}**")
                         u_text_vi = st.text_input("Nhập ý nghĩa Tiếng Việt tương ứng:", key=f"txt_vi_{target_word}", disabled=st.session_state.text_input_vi_submitted)
                         
-                        # Giải thuật kiểm tra thông minh: so khớp từ khóa chính
                         clean_u = u_text_vi.strip().lower()
                         clean_c = correct_meaning.strip().lower()
                         is_match = any(word in clean_c for word in clean_u.split()) if clean_u else False
@@ -389,11 +481,11 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                 st.markdown("### 📝 Thử Thách Điền Từ Vào Chỗ Trống")
                 input_answers = []
                 for idx, v_item in enumerate(vocabs):
-                    f_word, f_context = v_item[0], v_item[8]
+                    f_word, f_context = v_item[8], v_item[0]
                     with st.container(border=True):
-                        st.markdown(f"**Câu hỏi {idx+1}:** {hide_keyword_for_exercise(f_context, f_word)}")
-                        u_input = st.text_input("Nhập từ tiếng Anh còn thiếu:", key=f"fill_{f_word}", disabled=st.session_state.fill_blank_submitted)
-                        input_answers.append((f_word, u_input.strip()))
+                        st.markdown(f"**Câu hỏi {idx+1}:** {hide_keyword_for_exercise(f_word, f_context)}")
+                        u_input = st.text_input("Nhập từ tiếng Anh còn thiếu:", key=f"fill_{f_context}", disabled=st.session_state.fill_blank_submitted)
+                        input_answers.append((f_context, u_input.strip()))
                 
                 st.markdown("---")
                 if not st.session_state.fill_blank_submitted:
