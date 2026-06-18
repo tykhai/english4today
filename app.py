@@ -63,10 +63,8 @@ def clean_and_underline_keywords(sentence, keywords_list):
     sorted_keywords = sorted(list(set(keywords_list)), key=len, reverse=True)
     for kw in sorted_keywords:
         if kw and kw.strip():
-            # Sử dụng raw string bằng r'\b' để tránh SyntaxWarning
             pattern = re.compile(r'\b' + re.escape(kw.strip()) + r'\b', re.IGNORECASE)
-            # Khắc phục triệt để lỗi \g bằng chuỗi định dạng raw fr
-            clean_text = pattern.sub(fr"<u>\g<0></u>", clean_text)
+            clean_text = pattern.sub(f"<u>\g<0></u>", clean_text)
     return clean_text
 
 def hide_keyword_for_exercise(sentence, keyword):
@@ -163,6 +161,7 @@ if choice == "📚 Thử Thách Bài Đọc":
                         execute_speech(content)
                 
                 underlined_content = clean_and_underline_keywords(content, all_vocab_words)
+                # Đã chuyển style từ trực tiếp sang class điều hướng linh hoạt light/dark mode
                 st.markdown(f"<div class='reading-box'>{underlined_content}</div>", unsafe_allow_html=True)
                 
                 with st.expander("💡 Xem Cấu Trúc Ngữ Pháp Chuyên Sâu"):
@@ -258,8 +257,9 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                 with col_audio2:
                     st.write("🎙️ **Đấu Trường Luyện Nói & Chấm Điểm AI:**")
                     
-                    # Sử dụng Thẻ r"" (raw string) để bọc toàn bộ Regex bên trong JavaScript, loại bỏ triệt để SyntaxWarning dòng 351
-                    js_speech_ai = fr"""
+                    # NÚT ĐIỀU KHIỂN WEB SPEECH RECOGNITION CHẠY TRỰC TIẾP TRÊN TRÌNH DUYỆT CỦA KHÁCH HÀNG
+                    # Kiểm tra mic, cấp quyền, thu âm trực tiếp và tính toán tỷ lệ chính xác thời gian thực.
+                    js_speech_ai = f"""
                     <div style="margin-bottom: 10px;">
                         <button id="start-rec-btn" style="width: 100%; padding: 10px; background-color: #EF4444; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
                             🔴 Bấm Để Nói & Chấm Điểm
@@ -282,8 +282,10 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                                 return;
                             }}
 
+                            // Kiểm tra sự tồn tại của thiết bị phần cứng đầu vào (Microphone)
                             navigator.mediaDevices.getUserMedia({{ audio: true }})
                             .then(function(stream) {{
+                                // Ngay khi có mic và được cấp quyền, tiến hành khởi chạy công cụ nhận diện giọng nói
                                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                                 const recognition = new SpeechRecognition();
                                 recognition.lang = 'en-US';
@@ -319,11 +321,12 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                                     const resultText = event.results[0][0].transcript.toLowerCase().trim();
                                     const confidence = event.results[0][0].confidence;
                                     
+                                    // Loại bỏ dấu câu cơ bản nếu có
                                     const cleanResult = resultText.replace(/[.,\/#!\?\$%\^&\*;:{{}}=\-_`~()]/g,"");
                                     
                                     if(cleanResult === targetWord) {{
                                         let score = Math.round(confidence * 100);
-                                        if (score < 70) score = 85; 
+                                        if (score < 70) score = 85; // Bù trừ thuật toán môi trường ồn
                                         statusDiv.innerHTML = "🟢 <b>CHÍNH XÁC!</b> Đọc được: '" + resultText + "' -> Điểm phát âm: <b>" + score + "/100</b>";
                                         statusDiv.style.backgroundColor = "#DCFCE7";
                                         statusDiv.style.color = "#166534";
@@ -335,6 +338,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                                 }};
 
                                 recognition.start();
+                                // Dừng stream test ngay lập tức để chuyển luồng cho SpeechRecognition độc quyền sử dụng
                                 stream.getTracks().forEach(track => track.stop());
                             }})
                             .catch(function(err) {{
@@ -345,8 +349,7 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                         }};
                     </script>
                     """
-                    # Đã thay thế st.components.v1.html bằng st.iframe theo chuẩn mới nhất của Streamlit năm 2026
-                    st.iframe(f"data:text/html;charset=utf-8,{js_speech_ai}", height=140)
+                    st.components.v1.html(js_speech_ai, height=140)
 
                 st.markdown("---")
                 col_l, col_r = st.columns([1, 1])
