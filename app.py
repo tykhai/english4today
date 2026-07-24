@@ -25,6 +25,52 @@ st.set_page_config(page_title="English4Today - Học Gây Nghiện", page_icon="
 # --- CUSTOM CSS ---
 st.markdown("""
 <style>
+
+     /* HIỆU ỨNG RUNG KHI TRÚNG ĐÒN (SCREEN SHAKE) */
+    @keyframes shake {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        20% { transform: translate(-3px, 0px) rotate(-1deg); }
+        40% { transform: translate(1px, -1px) rotate(1deg); }
+        60% { transform: translate(-3px, 1px) rotate(0deg); }
+        80% { transform: translate(1px, -1px) rotate(-1deg); }
+        100% { transform: translate(0px, 0px) rotate(0deg); }
+    }
+    .boss-shake {
+        animation: shake 0.4s;
+        animation-iteration-count: 1;
+    }
+
+    /* KHUNG ĐẤU TRƯỜNG BOSS PHONG CÁCH DARK FANTASY / CYBERPUNK */
+    .rpg-boss-container {
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        border: 2px solid #6366f1;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        color: #f8fafc;
+        margin-bottom: 20px;
+    }
+
+    /* THANH MÁU RPG MƯỢT MÀ */
+    .rpg-hp-bar-container {
+        background-color: #334155;
+        border-radius: 999px;
+        overflow: hidden;
+        height: 18px;
+        border: 1px solid #475569;
+        margin: 8px 0;
+    }
+    .rpg-hp-fill-boss {
+        background: linear-gradient(90deg, #ef4444, #dc2626);
+        height: 100%;
+        transition: width 0.5s ease-in-out;
+    }
+    .rpg-hp-fill-player {
+        background: linear-gradient(90deg, #10b981, #059669);
+        height: 100%;
+        transition: width 0.5s ease-in-out;
+    }
+
     .main-header { font-size:34px !important; font-weight: 800; color: #1E3A8A; text-align: center; margin-bottom: 25px; }
     .flashcard { background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); padding: 30px; border-radius: 20px; border-left: 8px solid #4F46E5; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); margin-bottom: 20px; }
     /* Giữ nguyên màu chữ sáng tối tự động cho flashcard nếu chạy darkmode */
@@ -46,6 +92,7 @@ st.markdown("""
         margin-bottom: 15px;
         color: #1E293B; /* Mặc định chế độ sáng */
     }
+
     /* Tự động đảo màu chữ và nền khi người dùng đổi qua giao diện tối (Dark Mode) */
     @media (prefers-color-scheme: dark) {
         .reading-box { background-color: #064E3B; color: #F8FAFC; border-left-color: #34D399; }
@@ -186,20 +233,56 @@ if choice == "🏕️ Trại Chính (Game Dashboard)":
             
     if st.session_state.get('fighting_boss', False):
         import random
-    
-        # 1. Lấy ngày hiện tại hoặc ngày đang chọn để load từ vựng làm câu hỏi đánh Boss
+        
         fight_date = st.session_state.get('current_date')
         conn = sqlite3.connect(DB_NAME)
         if not fight_date:
             res_date = conn.execute("SELECT DISTINCT TRIM(vocab_date) FROM vocabulary ORDER BY vocab_date DESC LIMIT 1").fetchone()
             fight_date = res_date[0] if res_date else datetime.now().strftime('%Y-%m-%d')
-    
+        
         vocabs = conn.execute("SELECT word, meaning FROM vocabulary WHERE TRIM(vocab_date)=?", (fight_date,)).fetchall()
         conn.close()
-    
+        
         # Khởi tạo boss_engine
         boss_engine = BossBattleEngine(DB_NAME, st.session_state.user_id, fight_date, boss_level=1)
-        boss_engine.render_ui()
+        
+        # Khởi tạo máu trong session_state nếu chưa có (Giả sử Máu tối đa: Boss = 20, Player = 5)
+        if 'boss_current_hp' not in st.session_state:
+            st.session_state.boss_current_hp = 20
+        if 'player_current_hp' not in st.session_state:
+            st.session_state.player_current_hp = 5
+            
+        max_boss_hp = 20
+        max_player_hp = 5
+        
+        boss_pct = max(0, min(100, int((st.session_state.boss_current_hp / max_boss_hp) * 100)))
+        player_pct = max(0, min(100, int((st.session_state.player_current_hp / max_player_hp) * 100)))
+
+        # Giao diện Đấu Trường Boss Chuyên Nghiệp có hiệu ứng Rung
+        st.markdown("""
+            <div class="rpg-boss-container boss-shake">
+                <h2 style="text-align: center; color: #f59e0b; margin-top: 0;">⚔️ ĐẤU TRƯỜNG SINH TỬ: BOSS CUỐI NGÀY ⚔️</h2>
+                <p style="text-align: center; color: #94a3b8;">Tập trung cao độ! Trả lời đúng để tung đòn chí mạng, trả lời sai sẽ bị Boss phản công!</p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+        # RENDER THANH MÁU ĐỘNG (CHUYỂN ĐỘNG MƯỢT MÀ)
+        col_p, col_b = st.columns(2)        
+        with col_p:
+            st.markdown(f"🛡️ **Nhân Vật Của Bạn** (HP: {st.session_state.player_current_hp}/{max_player_hp})")
+            st.markdown(f"""
+                <div class="rpg-hp-bar-container">
+                    <div class="rpg-hp-fill-player" style="width: {player_pct}%;"></div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with col_b:
+            st.markdown(f"👹 **Tiểu Yêu (Boss)** (HP: {st.session_state.boss_current_hp}/{max_boss_hp})")
+            st.markdown(f"""
+                <div class="rpg-hp-bar-container">
+                    <div class="rpg-hp-fill-boss" style="width: {boss_pct}%;"></div>
+                </div>
+            """, unsafe_allow_html=True)
     
         if not vocabs:
             st.warning("⚠️ Không tìm thấy từ vựng nào cho ngày này để tạo câu hỏi đánh Boss!")
@@ -207,14 +290,12 @@ if choice == "🏕️ Trại Chính (Game Dashboard)":
                 st.session_state.fighting_boss = False
                 st.rerun()
         else:
-            # Quản lý index câu hỏi đánh Boss trong session_state để xoay vòng câu hỏi
             if 'boss_q_index' not in st.session_state:
                 st.session_state.boss_q_index = 0
         
             curr_idx = st.session_state.boss_q_index % len(vocabs)
             target_word, correct_meaning = vocabs[curr_idx]
         
-            # Tạo danh sách đáp án trắc nghiệm (1 đúng, các đáp án khác làm nhiễu)
             all_meanings = [v[1] for v in vocabs]
             wrong_meanings = [m for m in all_meanings if m != correct_meaning]
             selected_wrongs = random.sample(wrong_meanings, min(3, len(wrong_meanings)))
@@ -229,22 +310,35 @@ if choice == "🏕️ Trại Chính (Game Dashboard)":
                 submit_fight = st.form_submit_button("🔥 Tung Đòn Tấn Công", use_container_width=True)
             
                 if submit_fight:
+                    sound_script = ""
                     if user_choice == correct_meaning:
                         st.success(f"🎯 CHÍNH XÁC! Bạn đã chém trúng Boss với từ '{target_word}'!")
-                        boss_engine.process_answer(True) # Gọi logic trừ máu Boss
+                        boss_engine.process_answer(True)
+                        st.session_state.boss_current_hp = max(0, st.session_state.boss_current_hp - 4) # Trừ máu Boss
+                        # Âm thanh tấn công (Sử dụng Web Audio API tạo tiếng bíp chiến thắng/chém)
+                        sound_script = "<script>let ctx = new (window.AudioContext || window.webkitAudioContext)(); let osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(587.33, ctx.currentTime); osc.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.15);</script>"
                     else:
-                        st.error(f"❌ TRƯỢT! Bạn đã đọc sai. Đáp án đúng của '{target_word}' là: **{correct_meaning}**")
-                        boss_engine.process_answer(False) # Gọi logic trừ máu Player
-                
-                    # Chuyển sang câu hỏi tiếp theo cho đòn đánh kế tiếp
+                        st.error(f"❌ TRƯỢT! Đáp án đúng của '{target_word}' là: **{correct_meaning}**")
+                        boss_engine.process_answer(False)
+                        st.session_state.player_current_hp = max(0, st.session_state.player_current_hp - 1) # Trừ máu Player
+                        # Âm thanh bị thương (Tiếng trầm cảnh báo)
+                        sound_script = "<script>let ctx = new (window.AudioContext || window.webkitAudioContext)(); let osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, ctx.currentTime); osc.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.2);</script>"
+                    
+                    st.components.v1.html(sound_script, height=0)
                     st.session_state.boss_q_index += 1
                     st.rerun()
         
         st.markdown("---")
-        if st.button("🏃 Trốn Thoát Khỏi Trận Chiến", use_container_width=True):
+        col_esc1, col_esc2 = st.columns(2)
+        if col_esc1.button("🔄 Chơi Lại / Reset Máu", use_container_width=True):
+            st.session_state.boss_current_hp = 20
+            st.session_state.player_current_hp = 5
+            st.rerun()
+        if col_esc2.button("🏃 Trốn Thoát Khỏi Trận Chiến", use_container_width=True):
             st.session_state.fighting_boss = False
             st.session_state.pop('boss_q_index', None)
-            st.session_state.pop('boss_hp', None)
+            st.session_state.pop('boss_current_hp', None)
+            st.session_state.pop('player_current_hp', None)
             st.rerun()
 elif choice == "📚 Thử Thách Bài Đọc":
     st.markdown("<div class='main-header'>📚 Luyện Ngữ Liệu & Thử Thách Đọc Hiểu</div>", unsafe_allow_html=True)
