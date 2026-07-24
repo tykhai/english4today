@@ -1,3 +1,13 @@
+# 1. Thêm các import mới ở phần đầu file
+from game.migration import GameDatabaseMigration
+from game.player import PlayerData
+from game.daily_engine import DailyEngine
+from game.dashboard import GameDashboard
+from game.dungeon import DungeonEngine
+from game.boss import BossBattleEngine
+from game.shop import ShopEngine, InventoryEngine
+from game.reward_engine import RewardEngine
+
 import streamlit as st
 import sqlite3
 import json
@@ -49,6 +59,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 init_db()
+GameDatabaseMigration(DB_NAME).run_migrations()
 
 # --- HÀM BỔ TRỢ ---
 def clean_and_bold_keyword(sentence, keyword):
@@ -115,10 +126,25 @@ if st.session_state.user is None:
 
 user = st.session_state.user
 
+if user:
+    # Lấy user_id từ DB (Cần query thêm user_id vì state cũ của bạn chưa lưu ID)
+    conn = sqlite3.connect(DB_NAME)
+    u_id = conn.execute("SELECT user_id FROM users WHERE username=?", (user['username'],)).fetchone()[0]
+    conn.close()
+    
+    st.session_state.user_id = u_id
+    player = PlayerData(DB_NAME, u_id)
+    daily = DailyEngine(player)
+    daily.check_and_update_daily_login() # Tính Streak và hồi thể lực
+
+
 # --- SIDEBAR NAV ---
 with st.sidebar:
     st.markdown(f"### 🎉 Chiến binh: **{user['username']}**\n---")
     menu = []
+    menu.append("🏆 Thành Tựu & Bộ Sưu Tập")
+    menu.append("🏪 Cửa Hàng Vật Phẩm")
+    menu.append("🏕️ Trại Chính (Game Dashboard)")
     if user['allow_reading'] == 1 or user['role'] == 'admin': menu.append("📚 Thử Thách Bài Đọc")
     if user['allow_vocab'] == 1 or user['role'] == 'admin': menu.append("🧠 Từ Vựng Theo Ngày")
     if user['role'] == 'admin': menu.append("⚙️ Trung Tâm Admin")
@@ -135,7 +161,92 @@ with st.sidebar:
         st.rerun()
 
 # --- PHẦN 1: THỬ THÁCH BÀI ĐỌC ---
-if choice == "📚 Thử Thách Bài Đọc":
+# 5. Xử lý logic Tab "Trại Chính"
+if choice == "🏕️ Trại Chính (Game Dashboard)":
+    st.markdown("<div class='main-header'>🏕️ Khu Trại Dũng Giả</div>", unsafe_allow_html=True)
+    player = PlayerData(DB_NAME, st.session_state.user_id)
+    GameDashboard.render(player)
+    
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info("💡 Vào 'Từ Vựng Theo Ngày' để cày 20 phòng Dungeon (Room).")
+    with col2:
+        st.warning("⚔️ Đánh Boss cuối ngày để nhận thưởng lớn!")
+        # Demo gọi trận đánh Boss (bạn có thể map ngày hiện tại vào đây)
+        if st.button("🔥 Triệu Hồi Boss Ngày Hôm Nay", use_container_width=True):
+            # Khởi tạo boss_engine với ngày hiện tại (hoặc ngày mục tiêu)
+            current_date_str = st.session_state.get('current_date', datetime.now().strftime('%Y-%m-%d'))
+            b_engine = BossBattleEngine(DB_NAME, st.session_state.user_id, current_date_str, boss_level=1)
+            if b_engine.check_available(st.session_state.user_id):
+                st.session_state.fighting_boss = True # Hoặc điều hướng tab phù hợp
+                st.rerun()
+            else:
+                st.warning("Hôm nay bạn đã khiêu chiến boss hoặc chưa đủ điều kiện!")
+            
+    if st.session_state.get('fighting_boss', False):
+        import random
+    
+        # 1. Lấy ngày hiện tại hoặc ngày đang chọn để load từ vựng làm câu hỏi đánh Boss
+        fight_date = st.session_state.get('current_date')
+        conn = sqlite3.connect(DB_NAME)
+        if not fight_date:
+            res_date = conn.execute("SELECT DISTINCT TRIM(vocab_date) FROM vocabulary ORDER BY vocab_date DESC LIMIT 1").fetchone()
+            fight_date = res_date[0] if res_date else datetime.now().strftime('%Y-%m-%d')
+    
+        vocabs = conn.execute("SELECT word, meaning FROM vocabulary WHERE TRIM(vocab_date)=?", (fight_date,)).fetchall()
+        conn.close()
+    
+        # Khởi tạo boss_engine
+        boss_engine = BossBattleEngine(DB_NAME, st.session_state.user_id, fight_date, boss_level=1)
+        boss_engine.render_ui()
+    
+        if not vocabs:
+            st.warning("⚠️ Không tìm thấy từ vựng nào cho ngày này để tạo câu hỏi đánh Boss!")
+            if st.button("🏃 Thoát Trận Chiến", use_container_width=True):
+                st.session_state.fighting_boss = False
+                st.rerun()
+        else:
+            # Quản lý index câu hỏi đánh Boss trong session_state để xoay vòng câu hỏi
+            if 'boss_q_index' not in st.session_state:
+                st.session_state.boss_q_index = 0
+        
+            curr_idx = st.session_state.boss_q_index % len(vocabs)
+            target_word, correct_meaning = vocabs[curr_idx]
+        
+            # Tạo danh sách đáp án trắc nghiệm (1 đúng, các đáp án khác làm nhiễu)
+            all_meanings = [v[1] for v in vocabs]
+            wrong_meanings = [m for m in all_meanings if m != correct_meaning]
+            selected_wrongs = random.sample(wrong_meanings, min(3, len(wrong_meanings)))
+            options = sorted(list(set([correct_meaning] + selected_wrongs)))
+        
+            st.markdown("---")
+            st.markdown(f"### ⚔️ Thử Thách Đấu Trường Boss (Câu hỏi #{curr_idx + 1})")
+            st.info(f"💡 Chọn nghĩa tiếng Việt chính xác của từ: **{target_word}** để tung đòn tấn công!")
+        
+            with st.form(key=f"boss_quiz_form_{curr_idx}"):
+                user_choice = st.radio("Các lựa chọn:", options, key=f"boss_choice_{curr_idx}")
+                submit_fight = st.form_submit_button("🔥 Tung Đòn Tấn Công", use_container_width=True)
+            
+                if submit_fight:
+                    if user_choice == correct_meaning:
+                        st.success(f"🎯 CHÍNH XÁC! Bạn đã chém trúng Boss với từ '{target_word}'!")
+                        boss_engine.process_answer(True) # Gọi logic trừ máu Boss
+                    else:
+                        st.error(f"❌ TRƯỢT! Bạn đã đọc sai. Đáp án đúng của '{target_word}' là: **{correct_meaning}**")
+                        boss_engine.process_answer(False) # Gọi logic trừ máu Player
+                
+                    # Chuyển sang câu hỏi tiếp theo cho đòn đánh kế tiếp
+                    st.session_state.boss_q_index += 1
+                    st.rerun()
+        
+        st.markdown("---")
+        if st.button("🏃 Trốn Thoát Khỏi Trận Chiến", use_container_width=True):
+            st.session_state.fighting_boss = False
+            st.session_state.pop('boss_q_index', None)
+            st.session_state.pop('boss_hp', None)
+            st.rerun()
+elif choice == "📚 Thử Thách Bài Đọc":
     st.markdown("<div class='main-header'>📚 Luyện Ngữ Liệu & Thử Thách Đọc Hiểu</div>", unsafe_allow_html=True)
     conn = sqlite3.connect(DB_NAME)
     lessons = conn.execute("SELECT id, level, title, content, grammar_points, quiz FROM reading_lessons").fetchall()
@@ -229,6 +340,9 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
         vocabs = conn.execute("SELECT word, word_type, phonetic, meaning, prefix, suffix, funny_story, other_forms, context_easy, context_medium, context_hard FROM vocabulary WHERE TRIM(vocab_date)=?", (selected_date,)).fetchall()
         conn.close()
         
+        dungeon = DungeonEngine(DB_NAME, st.session_state.user_id, selected_date)
+        dungeon.render_dungeon_map()
+
         total_words = len(vocabs)
         if total_words > 0:
             tab_learn, tab_game, tab_game_rev, tab_input_en, tab_input_vi, tab_fill = st.tabs([
@@ -390,6 +504,25 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                 if not st.session_state.vocab_submitted:
                     if st.button("🚀 Nộp Bài Khảo Sát Từ Vựng", use_container_width=True):
                         v_score = sum(1 for u, c in game_answers if u == c)
+                        
+                        # --- TÍCH HỢP GAME ENGINE ---
+                        player = PlayerData(DB_NAME, st.session_state.user_id)
+                        inventory = InventoryEngine(DB_NAME, st.session_state.user_id)
+                        reward_engine = RewardEngine(player, inventory)
+                        dungeon = DungeonEngine(DB_NAME, st.session_state.user_id, selected_date)
+                        
+                        reward_key = f"rewarded_tab2_{selected_date}_{st.session_state.user_id}"
+                        if not st.session_state.get(reward_key):
+                            total_xp, total_gold = 0, 0
+                            for _ in range(v_score):
+                                if dungeon.clear_current_room():
+                                    rewards = reward_engine.grant_room_clear_reward()
+                                    total_xp += rewards["xp"]
+                                    total_gold += rewards["gold"]
+                            st.session_state[reward_key] = True
+                            if total_xp > 0: st.toast(f"⚔️ Nhận {total_xp} XP & {total_gold} Vàng từ Tab Trắc Nghiệm Xuôi!", icon="💰")
+                        # ----------------------------                        
+
                         if v_score == total_words: st.session_state.trigger_balloons = True
                         elif (v_score / total_words) >= 0.8: st.session_state.trigger_snow = True
                         st.session_state.vocab_submitted = True; st.rerun()
@@ -417,6 +550,25 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                 if not st.session_state.vocab_rev_submitted:
                     if st.button("🚀 Nộp Bài Khảo Sát Ngược", use_container_width=True):
                         vr_score = sum(1 for u, c in game_rev_answers if u == c)
+
+                        # --- TÍCH HỢP GAME ENGINE ---
+                        player = PlayerData(DB_NAME, st.session_state.user_id)
+                        inventory = InventoryEngine(DB_NAME, st.session_state.user_id)
+                        reward_engine = RewardEngine(player, inventory)
+                        dungeon = DungeonEngine(DB_NAME, st.session_state.user_id, selected_date)
+                        
+                        reward_key = f"rewarded_tab3_{selected_date}_{st.session_state.user_id}"
+                        if not st.session_state.get(reward_key):
+                            total_xp, total_gold = 0, 0
+                            for _ in range(vr_score):
+                                if dungeon.clear_current_room():
+                                    rewards = reward_engine.grant_room_clear_reward()
+                                    total_xp += rewards["xp"]
+                                    total_gold += rewards["gold"]
+                            st.session_state[reward_key] = True
+                            if total_xp > 0: st.toast(f"⚔️ Nhận {total_xp} XP & {total_gold} Vàng từ Tab Trắc Nghiệm Ngược!", icon="💰")
+                        # ----------------------------
+
                         if vr_score == total_words: st.session_state.trigger_balloons = True
                         elif (vr_score / total_words) >= 0.8: st.session_state.trigger_snow = True
                         st.session_state.vocab_rev_submitted = True; st.rerun()
@@ -443,6 +595,25 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                 if not st.session_state.text_input_en_submitted:
                     if st.button("🚀 Chấm Điểm Bài Gõ Tiếng Anh", use_container_width=True):
                         en_score = sum(1 for u, c in input_en_answers if u.lower() == c.lower())
+
+                        # --- TÍCH HỢP GAME ENGINE ---
+                        player = PlayerData(DB_NAME, st.session_state.user_id)
+                        inventory = InventoryEngine(DB_NAME, st.session_state.user_id)
+                        reward_engine = RewardEngine(player, inventory)
+                        dungeon = DungeonEngine(DB_NAME, st.session_state.user_id, selected_date)
+                        
+                        reward_key = f"rewarded_tab4_{selected_date}_{st.session_state.user_id}"
+                        if not st.session_state.get(reward_key):
+                            total_xp, total_gold = 0, 0
+                            for _ in range(en_score):
+                                if dungeon.clear_current_room():
+                                    rewards = reward_engine.grant_room_clear_reward()
+                                    total_xp += rewards["xp"]
+                                    total_gold += rewards["gold"]
+                            st.session_state[reward_key] = True
+                            if total_xp > 0: st.toast(f"⚔️ Nhận {total_xp} XP & {total_gold} Vàng từ Tab Gõ Từ!", icon="💰")
+                        # ----------------------------
+
                         if en_score == total_words: st.session_state.trigger_balloons = True
                         st.session_state.text_input_en_submitted = True; st.rerun()
                 else:
@@ -475,6 +646,25 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                         st.session_state.text_input_vi_submitted = True; st.rerun()
                 else:
                     vi_score = sum(1 for is_match, _ in input_vi_answers if is_match)
+
+                    # --- TÍCH HỢP GAME ENGINE ---
+                    player = PlayerData(DB_NAME, st.session_state.user_id)
+                    inventory = InventoryEngine(DB_NAME, st.session_state.user_id)
+                    reward_engine = RewardEngine(player, inventory)
+                    dungeon = DungeonEngine(DB_NAME, st.session_state.user_id, selected_date)
+                        
+                    reward_key = f"rewarded_tab5_{selected_date}_{st.session_state.user_id}"
+                    if not st.session_state.get(reward_key):
+                       total_xp, total_gold = 0, 0
+                       for _ in range(vi_score):
+                           if dungeon.clear_current_room():
+                               rewards = reward_engine.grant_room_clear_reward()
+                               total_xp += rewards["xp"]
+                               total_gold += rewards["gold"]
+                       st.session_state[reward_key] = True
+                       if total_xp > 0: st.toast(f"⚔️ Nhận {total_xp} XP & {total_gold} Vàng từ Tab Giải Nghĩa!", icon="💰")
+                        # ----------------------------
+
                     st.markdown(f"<div class='score-box'><h3>📊 TỔNG KẾT ĐIỂM GIẢI NGHĨA</h3><p style='font-size: 24px; font-weight: 700; color: #3B82F6;'>Giải nghĩa khớp: {vi_score} / {total_words} Từ</p></div>", unsafe_allow_html=True)
                     if st.button("🔄 Thử Sức Lại Phần Gõ Tiếng Việt", use_container_width=True):
                         st.session_state.text_input_vi_submitted = False; st.rerun()
@@ -494,6 +684,25 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                 if not st.session_state.fill_blank_submitted:
                     if st.button("🚀 Kiểm Tra Đáp Án Điền Từ", use_container_width=True):
                         f_score = sum(1 for f_w, u_in in input_answers if u_in.lower() == f_w.lower())
+
+                        # --- TÍCH HỢP GAME ENGINE ---
+                        player = PlayerData(DB_NAME, st.session_state.user_id)
+                        inventory = InventoryEngine(DB_NAME, st.session_state.user_id)
+                        reward_engine = RewardEngine(player, inventory)
+                        dungeon = DungeonEngine(DB_NAME, st.session_state.user_id, selected_date)
+                        
+                        reward_key = f"rewarded_tab6_{selected_date}_{st.session_state.user_id}"
+                        if not st.session_state.get(reward_key):
+                            total_xp, total_gold = 0, 0
+                            for _ in range(f_score):
+                                if dungeon.clear_current_room():
+                                    rewards = reward_engine.grant_room_clear_reward()
+                                    total_xp += rewards["xp"]
+                                    total_gold += rewards["gold"]
+                            st.session_state[reward_key] = True
+                            if total_xp > 0: st.toast(f"⚔️ Nhận {total_xp} XP & {total_gold} Vàng từ Tab Điền Từ!", icon="💰")
+                        # ----------------------------
+
                         if f_score == total_words: st.session_state.trigger_balloons = True
                         elif (f_score / total_words) >= 0.8: st.session_state.trigger_snow = True
                         st.session_state.fill_blank_submitted = True; st.rerun()
@@ -504,6 +713,29 @@ elif choice == "🧠 Từ Vựng Theo Ngày":
                     if st.button("🔄 Làm Lại Thử Thách Điền Từ", use_container_width=True):
                         st.session_state.fill_blank_submitted = False; st.rerun()
 
+elif choice == "🏆 Thành Tựu & Bộ Sưu Tập":
+    from game.profile_menu import ProfileMenu
+    st.markdown("<div class='main-header'>🏆 Sảnh Danh Vang Cá Nhân</div>", unsafe_allow_html=True)
+    ProfileMenu.render(DB_NAME, st.session_state.user_id)
+
+elif choice == "🏪 Cửa Hàng Vật Phẩm":
+    from game.shop import ShopEngine
+    st.markdown("<div class='main-header'>🛒 Trung Tâm Giao Dịch</div>", unsafe_allow_html=True)
+    
+    player = PlayerData(DB_NAME, st.session_state.user_id)
+    inventory = InventoryEngine(DB_NAME, st.session_state.user_id)
+    shop = ShopEngine(player, inventory)
+    
+    shop.render_shop_ui()
+    
+    st.markdown("---")
+    st.markdown("### 🎒 Túi Đồ Của Bạn")
+    items = inventory.get_inventory()
+    if not items:
+        st.info("Túi đồ hiện đang trống rỗng.")
+    else:
+        for it in items:
+            st.write(f"🔹 **{it['item_name']}**: {it['quantity']} cái (Loại: {it['item_type']})")
 # --- TRUNG TÂM ADMIN ---
 elif choice == "⚙️ Trung Tâm Admin":
     st.title("⚙️ Trung Tâm Admin")
