@@ -343,7 +343,7 @@ if choice == "🏕️ Trại Chính (Game Dashboard)":
 elif choice == "📚 Thử Thách Bài Đọc":
     st.markdown("<div class='main-header'>📚 Luyện Ngữ Liệu & Thử Thách Đọc Hiểu</div>", unsafe_allow_html=True)
     conn = sqlite3.connect(DB_NAME)
-    lessons = conn.execute("SELECT id, level, title, content, grammar_points, quiz FROM reading_lessons").fetchall()
+    lessons = conn.execute("SELECT id, level, title, content, grammar_points, quiz FROM reading_lessons ORDER BY title DESC").fetchall()
     all_vocab_words = [r[0] for r in conn.execute("SELECT word FROM vocabulary").fetchall()]
     conn.close()
 
